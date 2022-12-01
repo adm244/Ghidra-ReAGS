@@ -1,0 +1,16 @@
+*.class
+*.sla
+*.obj
+
+dist/
+src/main/help/
+
+.antProperties.xml
+.project
+.classpath
+.settings/
+
+.gradle
+**/build/
+**/bin/
+!src/**/build/

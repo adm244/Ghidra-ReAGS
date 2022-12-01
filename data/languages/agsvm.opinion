@@ -1,0 +1,5 @@
+<opinions>
+    <constraint loader="Adventure Game Studio compiled script (scom3)" compilerSpecID="default">
+        <constraint primary="1" processor="AGSVM" size="32" variant="default" />
+    </constraint>
+</opinions>
