@@ -1,13 +1,17 @@
+# TODO(adm244): figure out memory spaces, stack pointers, call instructions
+# TODO(adm244): rename all "far" instructions so "far" appears in the mnemonic itself
+# TODO(adm244): implement p-code's for all instructions
+
 # sleigh specification file for AGSVM
 
 define endian=little;
 define alignment=4;
 
-define space ram type=ram_space size=4 default;
-# define space code type=ram_space size=4;
-define space stackvirt type=ram_space size=4;
-# define space stackreal type=ram_space size=4;
-
+# rom space contains all script sections except for ".data" since they are read-only
+define space rom type=ram_space size=4 default;
+# ram space contains ".data" section and stack(?)
+define space ram type=ram_space size=4;
+# registers space contains register values
 define space register type=register_space size=4;
 
 # general purpose registers
@@ -23,6 +27,7 @@ define register offset=0x20 size=4 [ sp op mar pc ];
 
 define token operation (32)
   opcode = (0,23)
+  instance = (24,31)
 ;
 
 define token operand (32)

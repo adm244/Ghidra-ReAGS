@@ -1,6 +1,6 @@
-package reags;
+package reags.scom3;
 
-public class SCOM3Fixup {
+public class ScriptFixup {
 
 	/**
 	 * Immediate value
@@ -40,7 +40,7 @@ public class SCOM3Fixup {
 	private byte type;
 	private int offset;
 
-	public SCOM3Fixup() {
+	public ScriptFixup() {
 		// TODO Auto-generated constructor stub
 	}
 

@@ -30,12 +30,12 @@ import ghidra.util.task.TaskMonitor;
 /**
  * TODO: Provide class-level documentation that describes what this exporter does.
  */
-public class ReAGSExporter extends Exporter {
+public class ScriptExporter extends Exporter {
 
 	/**
 	 * Exporter constructor.
 	 */
-	public ReAGSExporter() {
+	public ScriptExporter() {
 
 		// TODO: Name the exporter and associate a file extension with it
 

@@ -1,11 +1,11 @@
-package reags;
+package reags.scom3;
 
-public class SCOM3Import {
+public class ScriptImport {
 
 	private String name;
 	private long offset;
 	
-	public SCOM3Import(String name, long offset) {
+	public ScriptImport(String name, long offset) {
 		this.name = name;
 		this.offset = offset;
 	}

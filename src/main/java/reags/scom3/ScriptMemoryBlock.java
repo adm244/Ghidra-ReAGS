@@ -1,6 +1,6 @@
-package reags;
+package reags.scom3;
 
-public class SCOM3Section {
+public class ScriptMemoryBlock {
 
 	private String name;
 	private byte[] data;
@@ -9,7 +9,7 @@ public class SCOM3Section {
 	private boolean canWrite;
 	private boolean canExecute;
 
-	public SCOM3Section(String name, byte[] data, boolean canRead, boolean canWrite, boolean canExecute) {
+	public ScriptMemoryBlock(String name, byte[] data, boolean canRead, boolean canWrite, boolean canExecute) {
 		this.name = name;
 		this.data = data;
 		this.canRead = canRead;

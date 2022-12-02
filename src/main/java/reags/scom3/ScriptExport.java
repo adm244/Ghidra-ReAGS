@@ -1,6 +1,6 @@
-package reags;
+package reags.scom3;
 
-public class SCOM3Export {
+public class ScriptExport {
 
 	public static final byte FUNCTION = 1;
 	public static final byte DATA = 2;
@@ -9,7 +9,7 @@ public class SCOM3Export {
 	private byte type;
 	private int offset;
 	
-	public SCOM3Export(String name, byte type, int offset) {
+	public ScriptExport(String name, byte type, int offset) {
 		this.name = name;
 		this.type = type;
 		this.offset = offset;

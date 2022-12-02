@@ -4,10 +4,11 @@
 
 <compiler_spec>
   <data_organization>
-	<pointer_size value="4" />
+	<pointer_size value="4"/>
   </data_organization>
   <global>
     <range space="ram"/>
+    <range space="rom"/>
   </global>
   <stackpointer register="sp" space="ram"/>
   <default_proto>
