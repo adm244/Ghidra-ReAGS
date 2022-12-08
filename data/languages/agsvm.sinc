@@ -1,525 +1,524 @@
 # TODO(adm244): figure out memory spaces, stack pointers, call instructions
-# TODO(adm244): rename all "far" instructions so "far" appears in the mnemonic itself
 # TODO(adm244): implement p-code's for all instructions
 
 # sleigh specification file for AGSVM
 
 define endian=little;
+
 define alignment=4;
 
-# rom space contains all script sections except for ".data" since they are read-only
-define space rom type=ram_space size=4 default;
-# ram space contains ".data" section and stack(?)
-define space ram type=ram_space size=4;
+define space ram type=ram_space size=4 default;
+
+#define space data type=ram_space size=4;
+#define space code type=ram_space size=4;
+#define space strings type=ram_space size=4;
+
+#define space code type=ram_space size=4;
+
+#define space ram type=ram_space size=4;
 # registers space contains register values
 define space register type=register_space size=4;
 
 # general purpose registers
 define register offset=0x00 size=4 [ ax bx cx dx ];
 # special registers
-define register offset=0x20 size=4 [ sp op mar pc ];
+define register offset=0x20 size=4 [ sp op mar pc bp counter ];
+
 # util registers
 # define register offset=0x100 size=4 [ sp_real ];
-
 # define pcodeop callext;
+#define pcodeop assert;
+define pcodeop strcmp;
 
 #TOKENS
-
 define token operation (32)
-  opcode = (0,23)
-  instance = (24,31)
+    opcode   = ( 0,23)
+    instance = (24,31)
 ;
 
 define token operand (32)
-  reg1 = (0,2)
-  reg2 = (0,2)
-  arg1 = (0,31)
-  arg2 = (0,31)
-  arg3 = (0,31)
+    reg1 = (0, 2)
+    reg2 = (0, 2)
+    arg1 = (0,31) signed
+    arg2 = (0,31) signed
+    arg3 = (0,31) signed
 ;
 
 attach variables [ reg1 reg2 ] [ _ sp mar ax bx cx op dx ];
 
+# FIXME(adm244): !!! something is TERRIBLY wrong with a stack !!!
+
 # MARCO
+macro push(x) {
+    *:4 sp = x;
+    sp = sp + 4;
+}
 
-# macro push(x)
-# {
-#   addr = sp * 4;
-#   *[stack]:4 addr = x:4;
-#   sp = sp + 1;
-# }
-
-# macro pop(x)
-# {
-#   sp = sp - 1;
-#   addr = sp * 4;
-#   x:4 = *[stack]:4 addr;
-# }
+macro pop(x) {
+    sp = sp - 4;
+    x = *:4 sp;
+}
 
 # macro pushreal(x)
 # {
 #   *[stackreal]:4 sp_real = x:4;
 #   sp_real = sp_real + 1;
 # }
-
 # macro subreal(x)
 # {
 #   sp_real = sp_real - x;
 # }
+# Constructors
+dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
+    export *:4 rel;
+}
 
+#funcdest: rel  is reg1 [ rel = reg1 * 4; ] {
+#    export *[code]:4 rel;
+#}
 # Instructions
-
 # add (imm)
-:add reg1, arg2 is opcode=0x01; reg1; arg2
-{
-  # reg1 = reg1 + arg2;
+:add reg1, arg2        is opcode=0x01; reg1; arg2 {
+    reg1 = reg1 + arg2;
 }
 
 # sub (imm)
-:sub reg1, arg2 is opcode=0x02; reg1; arg2
-{
-  # reg1 = reg1 - arg2;
+:sub reg1, arg2        is opcode=0x02; reg1; arg2 {
+    reg1 = reg1 - arg2;
 }
 
 # regtoreg
-:mov reg2, reg1 is opcode=0x03; reg1; reg2
-{
-  # reg2 = reg1;
+:mov reg2, reg1        is opcode=0x03; reg1; reg2 {
+    reg2 = reg1;
 }
 
 # writelit
-:copy [arg2], arg1 is opcode=0x04; arg1; arg2
-{
-  # *[ram]:8 MAR = *[ram]:8 arg2;
+:memcpy arg2, arg1     is opcode=0x04; arg1; arg2 {
+    if (arg1:4 == 1) goto <byte>;
+    if (arg1:4 == 2) goto <word>;
+
+    *:4 mar = arg2:4;
+    goto inst_next;
+
+    <byte>
+    *:1 mar = arg2:1;
+    goto inst_next;
+
+    <word>
+    *:2 mar = arg2:2;
+    goto inst_next;
 }
 
-# :copy [mar], [arg2], arg1 is (opcode=0x04 & arg1=2); arg1; arg2
-# {
-#   # *[ram]:16 MAR = *[ram]:16 arg2;
-# }
-
-# :copy [mar], [arg2], arg1 is (opcode=0x04 & arg1=4); arg1; arg2
-# {
-#   # *[ram]:32 MAR = *[ram]:32 arg2;
-# }
-
 # ret
-:ret is opcode=0x05
-{
-  # local addr = *[stack]:4 SP;
-  # if (addr == 0) addr = AX;
-  # return addr;
+:ret                   is opcode=0x05 {
+    pop(pc);
+    return [pc];
 }
 
 # littoreg
-:mov reg1, arg2 is opcode=0x06; reg1; arg2
-{
-  # reg1 = arg2;
+:mov reg1, arg2        is opcode=0x06; reg1; arg2 {
+    reg1 = arg2;
 }
 
 # memread
-:mov reg1, "dword [mar]" is opcode=0x07; reg1
-{
-  # reg1 = *[ram]:4 mar;
+:memread4 reg1         is opcode=0x07; reg1 {
+    reg1 = *:4 mar;
 }
 
 # memwrite
-:mov "dword [mar]", reg1 is opcode=0x08; reg1
-{
-  # *[ram]:4 mar = reg1;
+:memwrite4 reg1        is opcode=0x08; reg1 {
+    *:4 mar = reg1;
 }
 
 # mulreg
-:mul reg1, reg2 is opcode=0x09; reg1; reg2
-{
-  # reg1 = reg1 * reg2;
+:mul reg1, reg2        is opcode=0x09; reg1; reg2 {
+    reg1 = reg1 * reg2;
 }
 
 # divreg
-:div reg1, reg2 is opcode=0x0a; reg1; reg2
-{
-  # reg1 = reg1 / reg2;
+:div reg1, reg2        is opcode=0x0a; reg1; reg2 {
+    reg1 = reg1 / reg2;
 }
 
 # addreg
-:add reg1, reg2 is opcode=0x0b; reg1; reg2
-{
-  # reg1 = reg1 + reg2;
+:add reg1, reg2        is opcode=0x0b; reg1; reg2 {
+    reg1 = reg1 + reg2;
 }
 
 # subreg
-:sub reg1, reg2 is opcode=0x0c; reg1; reg2
-{
-  # reg1 = reg1 - reg2;
+:sub reg1, reg2        is opcode=0x0c; reg1; reg2 {
+    reg1 = reg1 - reg2;
 }
 
 # bitand
-:and reg1, reg2 is opcode=0xd; reg1; reg2
-{
-  # reg1 = reg1 & reg2;
+:and reg1, reg2        is opcode=0xd; reg1; reg2 {
+    reg1 = reg1 & reg2;
 }
 
 # bitor
-:or reg1, reg2 is opcode=0xe; reg1; reg2
-{
-  # reg1 = reg1 | reg2;
+:or reg1, reg2         is opcode=0xe; reg1; reg2 {
+    reg1 = reg1 | reg2;
 }
 
 # isequal
-:cmpeq reg1, reg2 is opcode=0x0f; reg1; reg2
-{
-  # reg1 = reg1 == reg2;
+:cmpeq reg1, reg2      is opcode=0x0f; reg1; reg2 {
+    reg1 = zext(reg1 == reg2);
 }
 
 # notequal
-:cmpneq reg1, reg2 is opcode=0x10; reg1; reg2
-{
-  # reg1 = reg1 != reg2;
+:cmpneq reg1, reg2     is opcode=0x10; reg1; reg2 {
+    reg1 = zext(reg1 != reg2);
 }
 
 # greater
-:cmpgt reg1, reg2 is opcode=0x11; reg1; reg2
-{
-  # reg1 = reg1 > reg2;
+:cmpgt reg1, reg2      is opcode=0x11; reg1; reg2 {
+    reg1 = zext(reg1 s> reg2);
 }
 
 # lessthan
-:cmplt reg1, reg2 is opcode=0x12; reg1; reg2
-{
-  # reg1 = reg1 < reg2;
+:cmplt reg1, reg2      is opcode=0x12; reg1; reg2 {
+    reg1 = zext(reg1 s< reg2);
 }
 
 # gte
-:cmpge reg1, reg2 is opcode=0x13; reg1; reg2
-{
-  # reg1 = reg1 >= reg2;
+:cmpge reg1, reg2      is opcode=0x13; reg1; reg2 {
+    reg1 = zext(reg1 s>= reg2);
 }
 
 # lte
-:cmple reg1, reg2 is opcode=0x14; reg1; reg2
-{
-  # reg1 = reg1 <= reg2;
+:cmple reg1, reg2      is opcode=0x14; reg1; reg2 {
+    reg1 = zext(reg1 s<= reg2);
 }
 
 # and (logical)
-:and reg1, reg2 is opcode=0x15; reg1; reg2
-{
-  # reg1 = reg1 && reg2;
+:land reg1, reg2       is opcode=0x15; reg1; reg2 {
+    if (reg1 == 0) goto <false>;
+    if (reg2 == 0) goto <false>;
+
+    reg1 = 1;
+    goto inst_next;
+
+    <false>
+    reg1 = 0;
 }
 
 # or (logical)
-:or reg1, reg2 is opcode=0x16; reg1; reg2
-{
-  # reg1 = reg1 || reg2;
+:lor reg1, reg2        is opcode=0x16; reg1; reg2 {
+    if (reg1 != 0) goto <true>;
+    if (reg2 != 0) goto <true>;
+
+    reg1 = 0;
+    goto inst_next;
+
+    <true>
+    reg1 = 1;
 }
 
+#dest2: rel2  is reg1 {
+##    addr:4 = rel2 * 4;
+#    export *[code]:4 addr;
+#}
+
+#define pcodeop log;
+
 # call
-:call reg1 is opcode=0x17; reg1
-{
-  # push(inst_next);
-  # # FIXME: reg1 can be absolute or relative
-  # addr = *[code]:4 reg1;
-  # call addr;
+:call reg1             is opcode=0x17; reg1 {
+    addr:4 = &:4 inst_next;
+    push(addr);
+#    log(addr);
+    call [reg1];
 }
 
 # memreadb
-:mov reg1, "byte [mar]" is opcode=0x18; reg1
-{
-  # reg1 = *[ram]:1 mar;
+:memread1 reg1         is opcode=0x18; reg1 {
+    reg1 = *:1 mar;
 }
 
 # memreadw
-:mov reg1, "word [mar]" is opcode=0x19; reg1
-{
-  # reg1 = *[ram]:2 mar;
+:memread2 reg1         is opcode=0x19; reg1 {
+    reg1 = *:2 mar;
 }
 
 # memwriteb
-:mov "byte [mar]", reg1 is opcode=0x1a; reg1
-{
-  # *[ram]:1 mar = reg1;
+:memwrite1 reg1        is opcode=0x1a; reg1 {
+    *:1 mar = reg1;
 }
 
 # memwritew
-:mov "word [mar]", reg1 is opcode=0x1b; reg1
-{
-  # *[ram]:2 mar = reg1;
+:memwrite2 reg1        is opcode=0x1b; reg1 {
+    *:2 mar = reg1;
 }
 
 # jz
-:jz arg1 is opcode=0x1c; arg1
-{
-  # if (ax == 0) goto [rel:4];
+:jz dest               is opcode=0x1c; dest {
+    if (ax == 0) goto dest;
 }
 
 # pushreg
-:push reg1 is opcode=0x1d; reg1
-{
-  # push(reg1);
+:push reg1             is opcode=0x1d; reg1 {
+    push(reg1);
 }
 
 # popreg
-:pop reg1 is opcode=0x1e; reg1
-{
-  # pop(reg1);
+:pop reg1              is opcode=0x1e; reg1 {
+    pop(reg1);
 }
 
 # jmp
-:jmp arg1 is opcode=0x1f; arg1
-{
-  # goto [rel:4];
+:jmp dest              is opcode=0x1f; dest {
+    goto dest;
 }
 
 # mul (imm)
-:mul reg1, arg2 is opcode=0x20; reg1; arg2
-{
-  # reg1 = reg1 * arg2;
+:mul reg1, arg2        is opcode=0x20; reg1; arg2 {
+    reg1 = reg1 * arg2;
 }
 
 # callext
-:call "far" reg1 is opcode=0x21; reg1
-{
-  # callext(reg1);
+:farcall reg1          is opcode=0x21; reg1 {
+    # callext(reg1);
+    push(&:4 inst_next);
+    call [reg1];
 }
 
 # pushreal
-:push "far" reg1 is opcode=0x22; reg1
-{
-  # pushreal(reg1);
+:farpush reg1          is opcode=0x22; reg1 {
+    # pushreal(reg1);
+    push(reg1);
 }
 
 # subrealstack
-:sub "sp", arg1 is opcode=0x23; arg1
-{
-  # subreal(arg1);
+:farsubsp arg1         is opcode=0x23; arg1 {
+    # subreal(arg1);
+    sp = sp - arg1 * 4;
 }
 
 # linenum
-:line arg1 is opcode=0x24; arg1
-{
-  # NOP
+:sourceline arg1       is opcode=0x24; arg1 {
+    # NOP
 }
 
 # callas
-:callobj arg1 is opcode=0x25; arg1
-{
-
+:callscr arg1          is opcode=0x25; arg1 {
 }
 
 # thisbase
-:thisbase arg1 is opcode=0x26; arg1
-{
-
+:thisaddr              is opcode=0x26; arg1 {
+#    FIXME(adm244): incorrect address 
+    bp = arg1;
 }
 
 # numfuncargs
-:args arg1 is opcode=0x27; arg1
-{
-
+:setfuncargs arg1      is opcode=0x27; arg1 {
 }
 
 # modreg
-:mod reg1, reg2 is opcode=0x28; reg1; reg2
-{
-  # reg1 = reg1 % reg2;
+:mod reg1, reg2        is opcode=0x28; reg1; reg2 {
+    reg1 = reg1 % reg2;
 }
 
 # xorreg
-:xor reg1, reg2 is opcode=0x29; reg1; reg2
-{
-  # reg1 = reg1 ^ reg2;
+:xor reg1, reg2        is opcode=0x29; reg1; reg2 {
+    reg1 = reg1 ^ reg2;
 }
 
 # notreg
-:lnot reg1 is opcode=0x2a; reg1
-{
-  # reg1 = !reg1;
+:lnot reg1             is opcode=0x2a; reg1 {
+    if (reg1 == 0) goto <false>;
+
+    reg1 = 0;
+    goto inst_next;
+
+    <false>
+    reg1 = 1;
 }
 
 # shiftleft
-:shl reg1, reg2 is opcode=0x2b; reg1; reg2
-{
-  # reg1 = reg1 << reg2;
+:shl reg1, reg2        is opcode=0x2b; reg1; reg2 {
+    reg1 = reg1 << reg2;
 }
 
 # shiftright
-:shr reg1, reg2 is opcode=0x2c; reg1; reg2
-{
-  # reg1 = reg1 >> reg2;
+:shr reg1, reg2        is opcode=0x2c; reg1; reg2 {
+    reg1 = reg1 >> reg2;
 }
 
 # callobj
-:mov "op", reg1 is opcode=0x2d; reg1
-{
-  # op = reg1;
+:mov op, reg1          is opcode=0x2d & op; reg1 {
+    op = reg1;
 }
 
 # checkbounds
-:assert reg1, arg2 is opcode=0x2e; reg1; arg2
-{
-
+:assertlte reg1, arg2  is opcode=0x2e; reg1; arg2 {
+#    assert(reg1:4, 0:4, arg2:4);
+    # NOP
 }
 
 # memwriteptr
-:memmov "mar", reg1 is opcode=0x2f; reg1
-{
-
+:memwrite.ptr reg1     is opcode=0x2f; reg1 {
+    *:4 mar = reg1;
 }
 
 # memreadptr
-:memmov reg1, "mar" is opcode=0x30; reg1
-{
-
+:memread.ptr reg1      is opcode=0x30; reg1 {
+    reg1 = *:4 mar;
 }
 
 # memzeroptr
-:memzero "mar", 0 is opcode=0x31
-{
-  # mar = 0;
+:memzero.ptr           is opcode=0x31 {
+    *:4 mar = 0;
 }
 
 # meminit
-:meminit "mar", reg1 is opcode=0x32; reg1
-{
-
+:meminit reg1          is opcode=0x32; reg1 {
+    *:4 mar = reg1;
 }
 
-# loadspoffs
-:stack arg1 is opcode=0x33; arg1
-{
+#define pcodeop log;
 
+# loadspoffs
+:stackptr arg1         is opcode=0x33; arg1 {
+    mar = sp - arg1;
+#    log(sp, arg1:4, mar);
 }
 
 # checknull
-:assert "mar" is opcode=0x34
-{
-
+:assert mar            is opcode=0x34 & mar {
+#    assert(mar);
+    # NOP
 }
 
 # fadd
-:fadd reg1, arg2 is opcode=0x35; reg1; arg2
-{
-
+:fadd reg1, arg2       is opcode=0x35; reg1; arg2 {
+    reg1 = reg1 f+ arg2;
 }
 
 # fsub
-:fsub reg1, arg2 is opcode=0x36; reg1; arg2
-{
-
+:fsub reg1, arg2       is opcode=0x36; reg1; arg2 {
+    reg1 = reg1 f- arg2;
 }
 
 # fmulreg
-:fmul reg1, reg2 is opcode=0x37; reg1; reg2
-{
-
+:fmul reg1, reg2       is opcode=0x37; reg1; reg2 {
+    reg1 = reg1 f* reg2;
 }
 
 # fdivreg
-:fdiv reg1, reg2 is opcode=0x38; reg1; reg2
-{
-
+:fdiv reg1, reg2       is opcode=0x38; reg1; reg2 {
+    reg1 = reg1 f/ reg2;
 }
 
 # faddreg
-:fadd reg1, reg2 is opcode=0x39; reg1; reg2
-{
-
+:fadd reg1, reg2       is opcode=0x39; reg1; reg2 {
+    reg1 = reg1 f+ reg2;
 }
 
 # fsubreg
-:fsub reg1, reg2 is opcode=0x3a; reg1; reg2
-{
-
+:fsub reg1, reg2       is opcode=0x3a; reg1; reg2 {
+    reg1 = reg1 f- reg2;
 }
 
 # fgreater
-:fcmpgt reg1, reg2 is opcode=0x3b; reg1; reg2
-{
-
+:fcmpgt reg1, reg2     is opcode=0x3b; reg1; reg2 {
+    reg1 = zext(reg1 f> reg2);
 }
 
 # flessthan
-:fcmplt reg1, reg2 is opcode=0x3c; reg1; reg2
-{
-  
+:fcmplt reg1, reg2     is opcode=0x3c; reg1; reg2 {
+    reg1 = zext(reg1 f< reg2);
 }
 
 # fgte
-:fcmpge reg1, reg2 is opcode=0x3d; reg1; reg2
-{
-
+:fcmpge reg1, reg2     is opcode=0x3d; reg1; reg2 {
+    reg1 = zext(reg1 f>= reg2);
 }
 
 # flte
-:fcmple reg1, reg2 is opcode=0x3e; reg1; reg2
-{
-  
+:fcmple reg1, reg2     is opcode=0x3e; reg1; reg2 {
+    reg1 = zext(reg1 f<= reg2);
 }
 
 # zeromemory
-:memclear "mar", arg1 is opcode=0x3f; arg1
-{
+:memzero arg1          is opcode=0x3f; arg1 {
+    counter = 0;
 
+    <start>
+    if (counter == arg1) goto inst_next;
+
+    *:4 mar + counter = 0;
+    counter = counter + 1;
+
+    goto <start>;
 }
 
 # createstring
-:strnew reg1 is opcode=0x40; reg1
-{
-
+:strnew reg1           is opcode=0x40; reg1 {
+#    TODO(adm244): reg1 is offset into .strings
+#    reg1 = newobject(reg1);
+#    reg1 = *[strings]:4 reg1;
+    reg1 = reg1;
 }
 
 # stringsequal
-:streq reg1, reg2 is opcode=0x41; reg1; reg2
-{
+:streq reg1, reg2      is opcode=0x41; reg1; reg2 {
+    local tmp:4 = strcmp(reg1, reg2);
 
+    if (tmp == 0) goto <true>;
+
+    reg1 = 0;
+    goto inst_next;
+
+    <true>
+    reg1 = 1;
 }
 
 # stringsnoteq
-:strneq reg1, reg2 is opcode=0x42; reg1; reg2
-{
+:strneq reg1, reg2     is opcode=0x42; reg1; reg2 {
+    local tmp:4 = strcmp(reg1, reg2);
 
+    if (tmp != 0) goto <true>;
+
+    reg1 = 0;
+    goto inst_next;
+
+    <true>
+    reg1 = 1;
 }
 
 # checknullreg
-:assert reg1 is opcode=0x43; reg1
-{
-
+:assert reg1           is opcode=0x43; reg1 {
+#    assert(reg1);
+    # NOP
 }
 
 # loopcheckoff
-:loopcheckoff is opcode=0x44
-{
-  # NOP
+:loopcheckoff          is opcode=0x44 {
+    # NOP
 }
 
 # memzeroptrnd
-:memzerond "mar", 0 is opcode=0x45
-{
-
+:memzerond             is opcode=0x45 {
+    *:4 mar = 0;
 }
 
 # jnz
-:jnz arg1 is opcode=0x46; arg1
-{
-  # if (ax != 0) goto [rel:4];
+:jnz dest              is opcode=0x46; dest {
+    if (ax != 0) goto dest;
 }
 
 # dynamicbounds
-:assert reg1, "mar" is opcode=0x47; reg1
-{
-
+:dynamicbounds reg1    is opcode=0x47; reg1 {
+    # NOP
 }
 
 # newarray
-:arrnew reg1, arg2, arg3 is opcode=0x48; reg1; arg2; arg3
-{
-
+:arrnew reg1, arg2, arg3  is opcode=0x48; reg1; arg2; arg3 {
+    reg1 = newobject(reg1, arg2:4, arg3:4);
 }
 
 # newuserobject
-:objnew reg1, arg2 is opcode=0x49; reg1; arg2
-{
-
+:objnew reg1, arg2     is opcode=0x49; reg1; arg2 {
+    reg1 = newobject(reg1, arg2:4);
 }
 
 ## sleigh include file for Skeleton language instructions

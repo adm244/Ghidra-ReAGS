@@ -15,12 +15,17 @@
  */
 package reags;
 
+import java.awt.Color;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import ghidra.app.util.Option;
 import ghidra.app.util.bin.BinaryReader;
@@ -29,19 +34,28 @@ import ghidra.app.util.bin.InputStreamByteProvider;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.app.util.opinion.AbstractProgramWrapperLoader;
 import ghidra.app.util.opinion.LoadSpec;
+import ghidra.app.util.viewer.listingpanel.PropertyBasedBackgroundColorModel;
 import ghidra.framework.model.DomainObject;
+import ghidra.framework.store.LockException;
+import ghidra.program.database.IntRangeMap;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
+import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
+import ghidra.program.model.mem.MemoryConflictException;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.util.NumericUtilities;
 import ghidra.util.exception.CancelledException;
+import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
 import reags.scom3.Script;
 import reags.scom3.ScriptExport;
+import reags.scom3.ScriptFixup;
+import reags.scom3.ScriptImport;
 import reags.scom3.ScriptMemoryBlock;
 
 /**
@@ -82,13 +96,19 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		Memory memory = program.getMemory();
 
 		try {
+			// STEP 0. Load and parse script file
 			Script script = new Script(provider);
 
-			// FIXME(adm244): maybe we should only create memory blocks in the loader...
-			// TODO(adm244): create segments (as namespaces probably)
-
+			// STEP 1. Create flat memory blocks for each script section in a file
 			createMemoryBlocks(api, script, loadSpec.getDesiredImageBase());
+
+			// STEP 2. Modify code section such that all offsets outside are absolute
+			applyFixups(api, memory, script);
+
+			// STEP 3. Mark all exported data and functions with their names
 			createExports(api, memory, script);
+
+			// TODO(adm244): create segments (as namespaces probably)
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -98,13 +118,13 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 	private void createMemoryBlocks(FlatProgramAPI api, Script script, long imageBase) throws Exception {
 		List<ScriptMemoryBlock> sections = new ArrayList<ScriptMemoryBlock>();
 
-		sections.add(new ScriptMemoryBlock(".data", script.getData(), true, false, false));
-		sections.add(new ScriptMemoryBlock(".code", script.getCode(), true, false, true));
-		sections.add(new ScriptMemoryBlock(".strings", script.getStrings(), true, false, false));
-		sections.add(new ScriptMemoryBlock(".fixups", script.getFixups(), true, false, false));
-		sections.add(new ScriptMemoryBlock(".imports", script.getImports(), true, false, false));
-		sections.add(new ScriptMemoryBlock(".exports", script.getExports(), true, false, false));
-		sections.add(new ScriptMemoryBlock(".sections", script.getSections(), true, false, false));
+		sections.add(new ScriptMemoryBlock("data", script.getData(), true, true, false));
+		sections.add(new ScriptMemoryBlock("code", script.getCode(), true, false, true));
+		sections.add(new ScriptMemoryBlock("strings", script.getStrings(), true, false, false));
+		sections.add(new ScriptMemoryBlock("fixups", script.getFixups(), true, false, false));
+		sections.add(new ScriptMemoryBlock("imports", script.getImports(), true, false, false));
+		sections.add(new ScriptMemoryBlock("exports", script.getExports(), true, false, false));
+		sections.add(new ScriptMemoryBlock("sections", script.getSections(), true, false, false));
 
 		Address address = api.toAddr(imageBase);
 
@@ -120,6 +140,7 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			if (data.length > 0) {
 				MemoryBlock memoryBlock = api.createMemoryBlock(name, address, data, false);
 				memoryBlock.setPermissions(canRead, canWrite, canExecute);
+				memoryBlock.setSourceName("Script loader");
 
 				long offset = address.add(data.length).getOffset();
 				long alignedOffset = NumericUtilities.getUnsignedAlignedValue(offset, 16);
@@ -128,26 +149,157 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		}
 	}
 
+	private void applyFixups(FlatProgramAPI api, Memory memory, Script script) throws Exception {
+		MemoryBlock fixupsBlock = memory.getBlock("fixups");
+		if (fixupsBlock == null) {
+			return;
+		}
+
+		MemoryBlock dataBlock = memory.getBlock("data");
+		MemoryBlock codeBlock = memory.getBlock("code");
+		MemoryBlock stringsBlock = memory.getBlock("strings");
+		MemoryBlock importsBlock = memory.getBlock("imports");
+
+		ScriptFixup[] fixups = readFixups(fixupsBlock);
+		ScriptImport[] imports = readImports(importsBlock);
+
+		Address externalBlockBase = api.toAddr(0x40000000);
+		Map<String, Address> externals = new HashMap<String, Address>();
+
+		MemoryBlock externalBlock = memory.createUninitializedBlock("_external", externalBlockBase, 0x10000, false);
+		long importsCount = 0;
+
+		for (int i = 0; i < fixups.length; ++i) {
+			byte type = fixups[i].getType();
+			int offset = fixups[i].getOffset();
+
+			Address codeOffset = codeBlock.getStart().add(offset * 4);
+			int value = api.getInt(codeOffset);
+
+			Address address = api.toAddr(value);
+
+			if (type == ScriptFixup.STRING) {
+				address = stringsBlock.getStart().add(value);
+			}
+
+			else if (type == ScriptFixup.IMPORT) {
+				String name = imports[value].getName();
+				
+				Address externalAddress = externalBlock.getStart().add(importsCount * 4);
+				
+				if (externals.containsKey(name)) {
+					externalAddress = externals.get(name);
+				} else {
+					externals.put(name, externalAddress);
+					++importsCount;
+				}
+
+				api.createLabel(externalAddress, name, false, SourceType.IMPORTED);
+				api.getCurrentProgram().getSymbolTable().addExternalEntryPoint(externalAddress);
+
+				address = externalAddress;
+			}
+
+			else if (type == ScriptFixup.FUNCTION) {
+				address = codeBlock.getStart().add(value * 4);
+			}
+
+			else if (type == ScriptFixup.DATA) {
+				address = dataBlock.getStart().add(value);
+			}
+
+			else if (type == ScriptFixup.DATAPOINTER) {
+				// TODO(adm244): handle this case
+				api.createBookmark(codeOffset, "DATAPOINTER", "DATAPOINTER fixup detected");
+				setBackgroundColor(api, codeOffset, Color.ORANGE);
+			}
+
+			else if (type == ScriptFixup.STACK) {
+				// TODO(adm244): handle this case
+				api.createBookmark(codeOffset, "STACK", "STACK fixup detected");
+				setBackgroundColor(api, codeOffset, Color.RED);
+			}
+
+			api.setInt(codeOffset, (int) address.getOffset());
+		}
+	}
+
+	// FIXME(adm244): move to utils
+	private void setBackgroundColor(FlatProgramAPI api, Address address, Color color) {
+		Program program = api.getCurrentProgram();
+
+		IntRangeMap map = program.getIntRangeMap(PropertyBasedBackgroundColorModel.COLOR_PROPERTY_NAME);
+		if (map == null) {
+			try {
+				map = program.createIntRangeMap(PropertyBasedBackgroundColorModel.COLOR_PROPERTY_NAME);
+			} catch (DuplicateNameException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		map.setValue(address, address, color.getRGB());
+	}
+
 	private void createExports(FlatProgramAPI api, Memory memory, Script script) throws IOException, Exception {
 		ScriptExport[] exports = readExports(script);
 
-		Address dataStart = memory.getBlock(".data").getStart();
-		Address codeStart = memory.getBlock(".code").getStart();
+		MemoryBlock dataBlock = memory.getBlock("data");
+		MemoryBlock codeBlock = memory.getBlock("code");
 
 		for (int i = 0; i < exports.length; ++i) {
 			String name = exports[i].getName();
 			byte type = exports[i].getType();
 			int offset = exports[i].getOffset();
 
-			if (type == ScriptExport.DATA) {
-				Address dataOffset = dataStart.add(offset);
+			if (type == ScriptExport.DATA && dataBlock != null) {
+				Address dataOffset = dataBlock.getStart().add(offset);
 				api.createLabel(dataOffset, name, true, SourceType.IMPORTED);
-			} else if (type == ScriptExport.FUNCTION) {
-				Address codeOffset = codeStart.add(offset * 4);
+			}
+
+			else if (type == ScriptExport.FUNCTION) {
+				Address codeOffset = codeBlock.getStart().add(offset * 4);
 				// TODO(adm244): use section name as namespace
 				api.createFunction(codeOffset, name);
 			}
 		}
+	}
+
+	// TODO(adm244): read this inside Script object instead
+	private ScriptFixup[] readFixups(MemoryBlock memoryBlock) throws IOException {
+		ByteProvider provider = new InputStreamByteProvider(memoryBlock.getData(), memoryBlock.getSize());
+		BinaryReader reader = new BinaryReader(provider, true);
+
+		int count = reader.readNextInt();
+		ScriptFixup[] fixups = new ScriptFixup[count];
+
+		for (int i = 0; i < fixups.length; ++i) {
+			fixups[i] = new ScriptFixup();
+			fixups[i].setType(reader.readNextByte());
+		}
+
+		for (int i = 0; i < fixups.length; ++i) {
+			fixups[i].setOffset(reader.readNextInt());
+		}
+
+		return fixups;
+	}
+
+	// TODO(adm244): read this inside Script object instead
+	private ScriptImport[] readImports(MemoryBlock memoryBlock) throws IOException {
+		ByteProvider provider = new InputStreamByteProvider(memoryBlock.getData(), memoryBlock.getSize());
+		BinaryReader reader = new BinaryReader(provider, true);
+
+		int count = reader.readNextInt();
+		ScriptImport[] imports = new ScriptImport[count];
+
+		for (int i = 0; i < imports.length; ++i) {
+			long offset = reader.getPointerIndex();
+			String name = reader.readNextAsciiString();
+
+			imports[i] = new ScriptImport(name, offset);
+		}
+
+		return imports;
 	}
 
 	// TODO(adm244): read this inside Script object instead
