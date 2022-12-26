@@ -2,6 +2,25 @@
 
 <!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/compiler_spec.rxg -->
 
+<!-- NOTES:
+    - (TODO) It seems that calling conventions work as intended at this point
+        the only exception is "nearcall" and "nearcallas", these two tend
+        to mess up a stack from time to time, I guess that's expected
+        since "extrapop" is "unknown" but it doesn't work even when there's
+        no function arguments that it expects to be passed into it...
+    
+    - For now farcall and call stacks are the same and it seems to work fine
+        for unoptimized assembly outputed by the classic AGS compiler, but
+        if something is pushed onto the stack after farpush instruction
+        (ether optimized or manually written code) the parameter order for
+        a farcall will be incorrect!
+        Is there a way to "split" a stack into two separate "sections"?
+        I guess we could introduce another "stack pointer" register and use
+        it for farpush, farcall and farsubsp instructions...
+        The problem here is that Ghidra's analysis will be wrong in this case,
+        right?
+ -->
+
 <compiler_spec>
     <global>
         <range space="ram"/>
@@ -9,15 +28,42 @@
     
     <stackpointer register="sp" space="ram" growth="positive"/>
     
-    <returnaddress>
-        <varnode space="stack" offset="0xFFFFF000" size="4"/>
-    </returnaddress>
-    
     <default_proto>
-        <prototype name="__agscall" extrapop="unknown" stackshift="4">
+        <!-- <prototype name="__agscall" type="stdcall" extrapop="unknown" stackshift="-4">
             <input>
-                <pentry minsize="1" maxsize="0x1000" align="4">
-                    <addr offset="0xFFFFEFFC" space="stack"/>
+                <pentry minsize="1" maxsize="500" align="4">
+                    <addr space="stack" offset="0xFFFFFE08"/>
+                </pentry>
+            </input>
+            <output killedbycall="true">
+                <pentry minsize="1" maxsize="4">
+                    <register name="ax"/>
+                </pentry>
+            </output>
+            <returnaddress>
+                <varnode space="stack" offset="-4" size="4"/>
+            </returnaddress>
+            <unaffected>
+                <register name="sp"/>
+            </unaffected>
+            <killedbycall>
+                <register name="op"/>
+            </killedbycall>
+            <likelytrash>
+                <register name="bx"/>
+                <register name="cx"/>
+                <register name="dx"/>
+            </likelytrash>
+            <localrange>
+                <range space="stack"/>
+            </localrange>
+        </prototype> -->
+
+        <prototype name="nearcall" extrapop="unknown" stackshift="-4">
+            <input>
+                <!-- TODO: increase stack size to 250*4; offset=twos(maxsize+4) -->
+                <pentry minsize="4" maxsize="16" align="4">
+                    <addr space="stack" offset="0xFFFFFFEC"/>
                 </pentry>
             </input>
             <output>
@@ -25,6 +71,65 @@
                     <register name="ax"/>
                 </pentry>
             </output>
+            <unaffected>
+                <register name="sp"/>
+                <register name="op"/>
+            </unaffected>
         </prototype>
     </default_proto>
+
+    <prototype name="nearcallas" extrapop="unknown" stackshift="-4" hasthis="true">
+        <input thisbeforeretpointer="true">
+            <pentry minsize="1" maxsize="4">
+                <register name="op"/>
+            </pentry>
+            <pentry minsize="4" maxsize="16" align="4">
+                <addr space="stack" offset="0xFFFFFFEC"/>
+            </pentry>
+        </input>
+        <output>
+            <pentry minsize="1" maxsize="4">
+                <register name="ax"/>
+            </pentry>
+        </output>
+        <unaffected>
+            <register name="sp"/>
+        </unaffected>
+    </prototype>
+
+    <prototype name="farcall" extrapop="-4" stackshift="-4">
+        <input>
+            <pentry minsize="4" maxsize="16" align="4">
+                <addr space="stack" offset="0xFFFFFFEC"/>
+            </pentry>
+        </input>
+        <output>
+            <pentry minsize="1" maxsize="4">
+                <register name="ax"/>
+            </pentry>
+        </output>
+        <unaffected>
+            <register name="sp"/>
+            <register name="op"/>
+        </unaffected>
+    </prototype>
+
+    <prototype name="farcallas" extrapop="-4" stackshift="-4" hasthis="true">
+        <input thisbeforeretpointer="true">
+            <pentry minsize="1" maxsize="4">
+                <register name="op"/>
+            </pentry>
+            <pentry minsize="4" maxsize="16" align="4">
+                <addr space="stack" offset="0xFFFFFFEC"/>
+            </pentry>
+        </input>
+        <output>
+            <pentry minsize="1" maxsize="4">
+                <register name="ax"/>
+            </pentry>
+        </output>
+        <unaffected>
+            <register name="sp"/>
+        </unaffected>
+    </prototype>
 </compiler_spec>

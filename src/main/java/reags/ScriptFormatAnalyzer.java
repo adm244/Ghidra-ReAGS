@@ -17,6 +17,7 @@ package reags;
 
 import java.awt.Color;
 import java.io.IOException;
+import java.util.Iterator;
 
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalysisPriority;
@@ -37,6 +38,9 @@ import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.Processor;
+import ghidra.program.model.listing.Bookmark;
+import ghidra.program.model.listing.BookmarkManager;
+import ghidra.program.model.listing.BookmarkType;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
@@ -68,7 +72,8 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		super(NAME, DESCRIPTION, AnalyzerType.BYTE_ANALYZER);
 		setDefaultEnablement(true);
 		setSupportsOneTimeAnalysis(false);
-		setPriority(AnalysisPriority.FORMAT_ANALYSIS);
+//		setPriority(AnalysisPriority.FORMAT_ANALYSIS);
+		setPriority(AnalysisPriority.DISASSEMBLY.after());
 	}
 
 	@Override
@@ -107,6 +112,36 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log)
 			throws CancelledException {
 		api = new FlatProgramAPI(program, monitor);
+
+//		BookmarkManager bookmarkManager = program.getBookmarkManager();
+//
+//		// NOTE(adm244): this creates memory references for imported data/functions
+//		Iterator<Bookmark> it = bookmarkManager.getBookmarksIterator(BookmarkType.INFO);
+//		while (it.hasNext()) {
+//			Bookmark bookmark = it.next();
+//			if (bookmark.getCategory().equals("IMPORT")) {
+//				Address bookmarkAddress = bookmark.getAddress();
+//
+//				Instruction instr = api.getInstructionContaining(bookmarkAddress);
+//				int opIndex = (int) (bookmarkAddress.subtract(instr.getAddress()) / 4 - 1);
+//
+//				try {
+//					Address refAddress = api.toAddr((long) api.getInt(bookmarkAddress));
+//					instr.addOperandReference(opIndex, refAddress, RefType.DATA, SourceType.ANALYSIS);
+//					bookmarkManager.removeBookmark(bookmark);
+//				} catch (Exception e) {
+//					// TODO: handle exception
+//					e.printStackTrace();
+//				}
+//			}
+//		}
+
+		// TODO(adm244): set appropriate calling-conventions to functions;
+		// we have 4: nearcall, nearcallas, farcall, farcallas:
+		// nearcall == stdcall
+		// nearcallas == stdcall + thiscall
+		// farcall == cdecl
+		// farcallas == cdecl + thiscall
 
 //		try {
 //			diassembleFunctions(program, monitor);
@@ -153,7 +188,7 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		if (fixupsBlock == null) {
 			return false;
 		}
-		
+
 		ScriptFixup[] fixups = readFixups(fixupsBlock);
 		ScriptImport[] imports = readImports(importsBlock);
 

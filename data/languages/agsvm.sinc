@@ -1,6 +1,3 @@
-# TODO(adm244): figure out memory spaces, stack pointers, call instructions
-# TODO(adm244): implement p-code's for all instructions
-
 # sleigh specification file for AGSVM
 
 define endian=little;
@@ -8,26 +5,11 @@ define endian=little;
 define alignment=4;
 
 define space ram type=ram_space size=4 default;
-
-#define space data type=ram_space size=4;
-#define space code type=ram_space size=4;
-#define space strings type=ram_space size=4;
-
-#define space code type=ram_space size=4;
-
-#define space ram type=ram_space size=4;
-# registers space contains register values
 define space register type=register_space size=4;
 
-# general purpose registers
 define register offset=0x00 size=4 [ ax bx cx dx ];
-# special registers
-define register offset=0x20 size=4 [ sp op mar pc bp counter ];
+define register offset=0x20 size=4 [ sp op mar farsp pc bp counter ];
 
-# util registers
-# define register offset=0x100 size=4 [ sp_real ];
-# define pcodeop callext;
-#define pcodeop assert;
 define pcodeop strcmp;
 
 #TOKENS
@@ -46,8 +28,6 @@ define token operand (32)
 
 attach variables [ reg1 reg2 ] [ _ sp mar ax bx cx op dx ];
 
-# FIXME(adm244): !!! something is TERRIBLY wrong with a stack !!!
-
 # MARCO
 macro push(x) {
     *:4 sp = x;
@@ -59,23 +39,11 @@ macro pop(x) {
     x = *:4 sp;
 }
 
-# macro pushreal(x)
-# {
-#   *[stackreal]:4 sp_real = x:4;
-#   sp_real = sp_real + 1;
-# }
-# macro subreal(x)
-# {
-#   sp_real = sp_real - x;
-# }
 # Constructors
 dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
     export *:4 rel;
 }
 
-#funcdest: rel  is reg1 [ rel = reg1 * 4; ] {
-#    export *[code]:4 rel;
-#}
 # Instructions
 # add (imm)
 :add reg1, arg2        is opcode=0x01; reg1; arg2 {
@@ -214,18 +182,9 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
     reg1 = 1;
 }
 
-#dest2: rel2  is reg1 {
-##    addr:4 = rel2 * 4;
-#    export *[code]:4 addr;
-#}
-
-#define pcodeop log;
-
 # call
 :call reg1             is opcode=0x17; reg1 {
-    addr:4 = &:4 inst_next;
-    push(addr);
-#    log(addr);
+    push(&:4 inst_next);
     call [reg1];
 }
 
@@ -276,7 +235,6 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # callext
 :farcall reg1          is opcode=0x21; reg1 {
-    # callext(reg1);
     push(&:4 inst_next);
     call [reg1];
 }
@@ -290,7 +248,8 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 # subrealstack
 :farsubsp arg1         is opcode=0x23; arg1 {
     # subreal(arg1);
-    sp = sp - arg1 * 4;
+    sp = sp - (arg1 * 4);
+#    farsub(arg1 * 4);
 }
 
 # linenum
@@ -305,7 +264,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 # thisbase
 :thisaddr              is opcode=0x26; arg1 {
 #    FIXME(adm244): incorrect address 
-    bp = arg1;
+#    bp = arg1;
 }
 
 # numfuncargs

@@ -21,11 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import ghidra.app.util.Option;
 import ghidra.app.util.bin.BinaryReader;
@@ -36,22 +32,22 @@ import ghidra.app.util.opinion.AbstractProgramWrapperLoader;
 import ghidra.app.util.opinion.LoadSpec;
 import ghidra.app.util.viewer.listingpanel.PropertyBasedBackgroundColorModel;
 import ghidra.framework.model.DomainObject;
-import ghidra.framework.store.LockException;
 import ghidra.program.database.IntRangeMap;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
-import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
-import ghidra.program.model.mem.MemoryConflictException;
 import ghidra.program.model.symbol.SourceType;
+import ghidra.program.model.symbol.SymbolTable;
+import ghidra.program.model.util.ObjectPropertyMap;
+import ghidra.program.model.util.PropertyMapManager;
 import ghidra.util.NumericUtilities;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
+import reags.properties.ImportProperty;
 import reags.scom3.Script;
 import reags.scom3.ScriptExport;
 import reags.scom3.ScriptFixup;
@@ -65,9 +61,38 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 
 	public static final String FORMAT_NAME = "Adventure Game Studio compiled script (scom3)";
 
+	public static final String IMPORT_PROPERTIES = "ImportProperties";
+
 	private static final String SCOM3_LANGUAGE_ID = "AGSVM:LE:32:default";
 	private static final String SCOM3_COMPILER_ID = "default";
 	private static final long IMAGE_BASE = 0x100000;
+
+	/*
+	 * TODO: DO THIS FIRST: figure out in the analyzer what is an imported function,
+	 * the rest is the data. Create a memory block for imported functions only and
+	 * mark it as external (code is below). Then change all imports addresses
+	 * separating data and functions into two groups. We know sizes of functions and
+	 * this should be easy, but for data it will overlap... I guess that's fine?
+	 * 
+	 * Use CODE_ANALYSIS priority to analyze farcall instructions and separate it
+	 * from data imports.
+	 * 
+	 * THEN figure out data imports sizes by:
+	 * 
+	 * a) matching against known named imports (things like player, character,
+	 * object, game, etc.)
+	 * 
+	 * b) analyzing usage of unmatched data (may be incorrect, but it's the best
+	 * we've got here)
+	 * 
+	 * AND create an "_external" memory block that will hold all imports.
+	 * 
+	 * AFTER that mark every imported function as a thunk call to external memory
+	 * AND create all data types.
+	 * 
+	 * This SHOULD get us to the point when we can care about things like analyzing
+	 * function prototypes, demangling function names, etc.
+	 */
 
 	@Override
 	public String getName() {
@@ -103,12 +128,10 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			createMemoryBlocks(api, script, loadSpec.getDesiredImageBase());
 
 			// STEP 2. Modify code section such that all offsets outside are absolute
-			applyFixups(api, memory, script);
+			applyFixups(api, memory, script, monitor);
 
 			// STEP 3. Mark all exported data and functions with their names
 			createExports(api, memory, script);
-
-			// TODO(adm244): create segments (as namespaces probably)
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -119,6 +142,8 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		List<ScriptMemoryBlock> sections = new ArrayList<ScriptMemoryBlock>();
 
 		sections.add(new ScriptMemoryBlock("data", script.getData(), true, true, false));
+		// FIXME(adm244): create memory block for each script section instead of single
+		// code block
 		sections.add(new ScriptMemoryBlock("code", script.getCode(), true, false, true));
 		sections.add(new ScriptMemoryBlock("strings", script.getStrings(), true, false, false));
 		sections.add(new ScriptMemoryBlock("fixups", script.getFixups(), true, false, false));
@@ -137,19 +162,19 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			boolean canWrite = section.getCanWrite();
 			boolean canExecute = section.getCanExecute();
 
-			if (data.length > 0) {
+			if (data != null && data.length > 0) {
 				MemoryBlock memoryBlock = api.createMemoryBlock(name, address, data, false);
 				memoryBlock.setPermissions(canRead, canWrite, canExecute);
 				memoryBlock.setSourceName("Script loader");
 
-				long offset = address.add(data.length).getOffset();
+				long offset = address.add(data.length).getUnsignedOffset();
 				long alignedOffset = NumericUtilities.getUnsignedAlignedValue(offset, 16);
 				address = api.toAddr(alignedOffset);
 			}
 		}
 	}
 
-	private void applyFixups(FlatProgramAPI api, Memory memory, Script script) throws Exception {
+	private void applyFixups(FlatProgramAPI api, Memory memory, Script script, TaskMonitor monitor) throws Exception {
 		MemoryBlock fixupsBlock = memory.getBlock("fixups");
 		if (fixupsBlock == null) {
 			return;
@@ -163,11 +188,28 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		ScriptFixup[] fixups = readFixups(fixupsBlock);
 		ScriptImport[] imports = readImports(importsBlock);
 
-		Address externalBlockBase = api.toAddr(0x40000000);
-		Map<String, Address> externals = new HashMap<String, Address>();
+//		long lastBlockOffset = memory.getMaxAddress().getUnsignedOffset();
+//		long externalBlockOffset = NumericUtilities.getUnsignedAlignedValue(lastBlockOffset + 1, 16);
 
-		MemoryBlock externalBlock = memory.createUninitializedBlock("_external", externalBlockBase, 0x10000, false);
-		long importsCount = 0;
+//		Address externalBlockBase = api.toAddr(externalBlockOffset);
+//		Map<String, Long> externals = new HashMap<String, Long>();
+		Program program = api.getCurrentProgram();
+		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
+		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
+				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
+
+		// NOTE(adm244): since we don't know data sizes (except when it's a function
+		// which can be just thunked) we use some magic number for all entries so they
+		// won't (mostly) overlap each other. Maybe a better solution would be matching
+		// imports name against a predefined set to figure out it's size first and then
+		// analyze data usage to guess all user-defined data sizes...
+//		int entrySize = 1000;
+
+		/*
+		 * These are reserved script names according to classic compilers source:
+		 * "inventory", "character", "views", "player", "object", "mouse", "system",
+		 * "game", "palette", "hotspot", "region", "dialog", "gui", "GUI"
+		 */
 
 		for (int i = 0; i < fixups.length; ++i) {
 			byte type = fixups[i].getType();
@@ -183,21 +225,28 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			}
 
 			else if (type == ScriptFixup.IMPORT) {
-				String name = imports[value].getName();
-				
-				Address externalAddress = externalBlock.getStart().add(importsCount * 4);
-				
-				if (externals.containsKey(name)) {
-					externalAddress = externals.get(name);
-				} else {
-					externals.put(name, externalAddress);
-					++importsCount;
-				}
+				String importName = imports[value].getName();
 
-				api.createLabel(externalAddress, name, false, SourceType.IMPORTED);
-				api.getCurrentProgram().getSymbolTable().addExternalEntryPoint(externalAddress);
+				importProperties.add(codeOffset, new ImportProperty(importName));
 
-				address = externalAddress;
+				// NOTE(adm244): this will be replaced at the later stage
+				address = Address.NO_ADDRESS;
+//
+//				Address externalAddress = externalBlockBase.add(externals.size() * entrySize);
+//
+//				if (externals.containsKey(name)) {
+//					externalAddress = externals.get(name);
+//				} else {
+//					externals.put(name, externalAddress);
+//				}
+//
+//				address = externalAddress;
+//
+//				api.getCurrentProgram().getBookmarkManager().setBookmark(codeOffset, BookmarkType.INFO, "IMPORT",
+//						String.format("%x", value));
+//
+////				api.createBookmark(codeOffset, "IMPORT", String.format("%x", value));
+////				setBackgroundColor(api, codeOffset, Color.YELLOW);
 			}
 
 			else if (type == ScriptFixup.FUNCTION) {
@@ -222,6 +271,35 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 
 			api.setInt(codeOffset, (int) address.getOffset());
 		}
+
+//		long externalBlockSize = externals.size() * entrySize;
+//		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
+//
+//		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
+//
+//		for (Entry<String, Address> external : externals.entrySet()) {
+//			Address externalAddress = external.getValue();
+//			String externalName = external.getKey();
+//
+//			// NOTE(adm244): this just adds named locations into IMPORTS folder
+//			externalManager.addExtLocation(Library.UNKNOWN, externalName, null, SourceType.IMPORTED);
+////
+//			api.createLabel(externalAddress, externalName, true, SourceType.IMPORTED);
+//
+//			/*
+//			 * TODO: Mark all functions called with farcall as external (code is below)
+//			 */
+//
+//			// TODO(adm244): move this into analyzer, I guess...
+////			Function externalFunction = api.createFunction(externalAddress, externalName);
+////			ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, externalName, null,
+////					SourceType.IMPORTED);
+////
+////			externalFunction.setThunkedFunction(externalLocation.getFunction());
+//
+//			// NOTE(adm244): external entry point means that this address is exported !!!
+////			api.getCurrentProgram().getSymbolTable().addExternalEntryPoint(externalAddress);
+//		}
 	}
 
 	// FIXME(adm244): move to utils
@@ -241,6 +319,7 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 	}
 
 	private void createExports(FlatProgramAPI api, Memory memory, Script script) throws IOException, Exception {
+		SymbolTable symbolTable = api.getCurrentProgram().getSymbolTable();
 		ScriptExport[] exports = readExports(script);
 
 		MemoryBlock dataBlock = memory.getBlock("data");
@@ -254,12 +333,14 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			if (type == ScriptExport.DATA && dataBlock != null) {
 				Address dataOffset = dataBlock.getStart().add(offset);
 				api.createLabel(dataOffset, name, true, SourceType.IMPORTED);
-			}
 
-			else if (type == ScriptExport.FUNCTION) {
+				symbolTable.addExternalEntryPoint(dataOffset);
+			} else if (type == ScriptExport.FUNCTION) {
 				Address codeOffset = codeBlock.getStart().add(offset * 4);
-				// TODO(adm244): use section name as namespace
 				api.createFunction(codeOffset, name);
+
+				// add this to EXPORTS list
+				symbolTable.addExternalEntryPoint(codeOffset);
 			}
 		}
 	}

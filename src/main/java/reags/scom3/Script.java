@@ -40,7 +40,10 @@ public class Script {
 			fixups = readFixups(reader);
 			imports = readImports(reader);
 			exports = readExports(reader);
-			sections = readSections(reader);
+
+			if (version >= 83) {
+				sections = readSections(reader);
+			}
 
 			int footer = reader.readNextInt();
 			if (footer != SCOM3_FOOTER) {
