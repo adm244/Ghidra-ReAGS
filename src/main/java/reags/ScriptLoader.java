@@ -21,7 +21,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import ghidra.app.util.Option;
 import ghidra.app.util.bin.BinaryReader;
@@ -36,18 +39,17 @@ import ghidra.program.database.IntRangeMap;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
+import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
+import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.symbol.SymbolTable;
-import ghidra.program.model.util.ObjectPropertyMap;
-import ghidra.program.model.util.PropertyMapManager;
 import ghidra.util.NumericUtilities;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
-import reags.properties.ImportProperty;
 import reags.scom3.Script;
 import reags.scom3.ScriptExport;
 import reags.scom3.ScriptFixup;
@@ -66,6 +68,8 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 	private static final String SCOM3_LANGUAGE_ID = "AGSVM:LE:32:default";
 	private static final String SCOM3_COMPILER_ID = "default";
 	private static final long IMAGE_BASE = 0x100000;
+
+	public static int importMaxSize = 32768;
 
 	/*
 	 * TODO: DO THIS FIRST: figure out in the analyzer what is an imported function,
@@ -188,22 +192,22 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		ScriptFixup[] fixups = readFixups(fixupsBlock);
 		ScriptImport[] imports = readImports(importsBlock);
 
-//		long lastBlockOffset = memory.getMaxAddress().getUnsignedOffset();
-//		long externalBlockOffset = NumericUtilities.getUnsignedAlignedValue(lastBlockOffset + 1, 16);
+		long lastBlockOffset = memory.getMaxAddress().getUnsignedOffset();
+		long externalBlockOffset = NumericUtilities.getUnsignedAlignedValue(lastBlockOffset + 1, 16);
 
-//		Address externalBlockBase = api.toAddr(externalBlockOffset);
-//		Map<String, Long> externals = new HashMap<String, Long>();
-		Program program = api.getCurrentProgram();
-		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
-		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
-				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
+		Address externalBlockBase = api.toAddr(externalBlockOffset);
+		Map<String, Address> externals = new HashMap<String, Address>();
+//		Program program = api.getCurrentProgram();
+//		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
+//		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
+//				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
 
 		// NOTE(adm244): since we don't know data sizes (except when it's a function
 		// which can be just thunked) we use some magic number for all entries so they
 		// won't (mostly) overlap each other. Maybe a better solution would be matching
 		// imports name against a predefined set to figure out it's size first and then
 		// analyze data usage to guess all user-defined data sizes...
-//		int entrySize = 1000;
+		int entrySize = 32768;
 
 		/*
 		 * These are reserved script names according to classic compilers source:
@@ -227,20 +231,22 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			else if (type == ScriptFixup.IMPORT) {
 				String importName = imports[value].getName();
 
-				importProperties.add(codeOffset, new ImportProperty(importName));
+//				Address externalAddress = externalBlockBase.add(value * importMaxSize);
+
+//				importProperties.add(codeOffset, new ImportProperty(address.getOffset(), importName));
 
 				// NOTE(adm244): this will be replaced at the later stage
-				address = Address.NO_ADDRESS;
+//				address = Address.NO_ADDRESS;
 //
-//				Address externalAddress = externalBlockBase.add(externals.size() * entrySize);
+				Address externalAddress = externalBlockBase.add(externals.size() * entrySize);
 //
-//				if (externals.containsKey(name)) {
-//					externalAddress = externals.get(name);
-//				} else {
-//					externals.put(name, externalAddress);
-//				}
+				if (externals.containsKey(importName)) {
+					externalAddress = externals.get(importName);
+				} else {
+					externals.put(importName, externalAddress);
+				}
 //
-//				address = externalAddress;
+				address = externalAddress;
 //
 //				api.getCurrentProgram().getBookmarkManager().setBookmark(codeOffset, BookmarkType.INFO, "IMPORT",
 //						String.format("%x", value));
@@ -272,34 +278,34 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			api.setInt(codeOffset, (int) address.getOffset());
 		}
 
-//		long externalBlockSize = externals.size() * entrySize;
-//		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
+		long externalBlockSize = externals.size() * entrySize;
+		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
 //
-//		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
+		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
+
+		for (Entry<String, Address> external : externals.entrySet()) {
+			Address externalAddress = external.getValue();
+			String externalName = external.getKey();
+
+			// NOTE(adm244): this just adds named locations into IMPORTS folder
+			externalManager.addExtLocation(Library.UNKNOWN, externalName, null, SourceType.IMPORTED);
 //
-//		for (Entry<String, Address> external : externals.entrySet()) {
-//			Address externalAddress = external.getValue();
-//			String externalName = external.getKey();
+			api.createLabel(externalAddress, externalName, true, SourceType.IMPORTED);
+
+			/*
+			 * TODO: Mark all functions called with farcall as external (code is below)
+			 */
+
+			// TODO(adm244): move this into analyzer, I guess...
+//			Function externalFunction = api.createFunction(externalAddress, externalName);
+//			ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, externalName, null,
+//					SourceType.IMPORTED);
 //
-//			// NOTE(adm244): this just adds named locations into IMPORTS folder
-//			externalManager.addExtLocation(Library.UNKNOWN, externalName, null, SourceType.IMPORTED);
-////
-//			api.createLabel(externalAddress, externalName, true, SourceType.IMPORTED);
-//
-//			/*
-//			 * TODO: Mark all functions called with farcall as external (code is below)
-//			 */
-//
-//			// TODO(adm244): move this into analyzer, I guess...
-////			Function externalFunction = api.createFunction(externalAddress, externalName);
-////			ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, externalName, null,
-////					SourceType.IMPORTED);
-////
-////			externalFunction.setThunkedFunction(externalLocation.getFunction());
-//
-//			// NOTE(adm244): external entry point means that this address is exported !!!
-////			api.getCurrentProgram().getSymbolTable().addExternalEntryPoint(externalAddress);
-//		}
+//			externalFunction.setThunkedFunction(externalLocation.getFunction());
+
+			// NOTE(adm244): external entry point means that this address is exported !!!
+//			api.getCurrentProgram().getSymbolTable().addExternalEntryPoint(externalAddress);
+		}
 	}
 
 	// FIXME(adm244): move to utils

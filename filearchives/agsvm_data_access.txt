@@ -1,0 +1,52 @@
+---------------------------------------
+	READ:
+
+mov mar, 0x313
+	mar = COPY 0x313:4
+add mar, 0x4
+	mar = INT_ADD mar, 4:4
+memread4 ax
+	ax = LOAD ram(mar)
+...
+mov mar, 0x313
+
+---------------------------------------
+	WRITE:
+
+mov mar, 0x56d
+	mar = COPY 0x56d:4
+memwrite4 ax
+	STORE ram(mar), ax
+...
+
+---------------------------------------
+	POINTER:
+
+mov mar, 0x312
+	mar = COPY 0x312:4
+push mar
+	STORE ram(sp), mar
+	sp = INT_ADD sp, 4:4
+pop mar
+	sp = INT_SUB sp, 4:4
+	mar = LOAD ram(sp)
+memread.ptr ax
+	ax = LOAD ram(mar)
+push ax
+pop mar
+mov ax, mar
+push op
+mov op,ax
+...
+
+----------------------------------------
+	ARRAY:
+
+mov ax, 0x1
+assertlte ax,0x10	; array length
+mul ax, 0x8		; element size
+    ax = INT_MULT ax, 8:4
+mov cx, ax
+...
+mov mar, 0x405
+add mar, cx

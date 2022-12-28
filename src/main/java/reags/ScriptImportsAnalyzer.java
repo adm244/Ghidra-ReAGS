@@ -15,6 +15,8 @@
  */
 package reags;
 
+import java.util.HashMap;
+
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalysisPriority;
 import ghidra.app.services.AnalyzerType;
@@ -29,12 +31,14 @@ import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.ParserContext;
 import ghidra.program.model.lang.Processor;
 import ghidra.program.model.lang.Register;
-import ghidra.program.model.listing.BookmarkType;
 import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryAccessException;
+import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.FlowType;
+import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.ObjectPropertyMap;
 import ghidra.program.model.util.PropertyMapManager;
 import ghidra.util.Saveable;
@@ -49,6 +53,9 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 
 	private static final String NAME = "Script imports analyzer";
 	private static final String DESCRIPTION = "Analyzes usage of imports and determines their types.";
+
+	private ObjectPropertyMap<? extends Saveable> importProperties;
+	private HashMap<String, ImportProperty> importPropertiesMap;
 
 	public ScriptImportsAnalyzer() {
 		super(NAME, DESCRIPTION, AnalyzerType.INSTRUCTION_ANALYZER);
@@ -86,9 +93,381 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 			throws CancelledException {
 		FlatProgramAPI api = new FlatProgramAPI(program);
 
-		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
-		ObjectPropertyMap<? extends Saveable> importProperties = propertiesManager
-				.getObjectPropertyMap(ScriptLoader.IMPORT_PROPERTIES);
+//		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
+//		importProperties = propertiesManager.getObjectPropertyMap(ScriptLoader.IMPORT_PROPERTIES);
+
+		// STEP 1. (DONE) Figure out import type (data or function)
+//		analyzeImportTypes(program, set, monitor, log);
+
+		/*
+		 * TODO(adm244):
+		 * 
+		 * 1) set base address for each import
+		 * 
+		 * 2) decompile containing function and iterate over global symbols
+		 * 
+		 * 3) for each global symbol get a node that creates it and get an import using
+		 * it's name
+		 * 
+		 * 4) calculate offset between import base and accessed symbol address
+		 * 
+		 * 5) if offset is bigger than current import size then change its size to be
+		 * offset + 4
+		 */
+
+//		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
+//
+//		AddressIterator iter = importProperties.getPropertyIterator();
+//		while (iter.hasNext()) {
+//			Address address = iter.next();
+//
+//			ImportProperty prop = (ImportProperty) importProperties.get(address);
+//			Address addr = api.toAddr(prop.getBaseOffset());
+//			String name = prop.getName();
+//			ImportType type = prop.getType();
+//
+//			try {
+////				if (type == ImportType.FUNCTION) {
+////					Function externalFunction = api.createFunction(addr, name);
+////					ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, name, null,
+////							SourceType.IMPORTED);
+////
+////					externalFunction.setThunkedFunction(externalLocation.getFunction());
+////				} else {
+//				api.createLabel(addr, name, true);
+////				}
+//
+//				if (type == ImportType.FUNCTION) {
+//					externalManager.addExtFunction(Library.UNKNOWN, name, addr, SourceType.ANALYSIS);
+//				}
+//			} catch (Exception e) {
+//				e.printStackTrace();
+//			}
+//		}
+
+//		importPropertiesMap = new HashMap<String, ImportProperty>();
+//		HashMap<Function, DecompileResults> decompCache = new HashMap<Function, DecompileResults>();
+
+//		BasicBlockModel blockModel = new BasicBlockModel(program, false);
+//		CodeBlockIterator iter = blockModel.getCodeBlocks(monitor);
+//		while (iter.hasNext()) {
+//			CodeBlock block = iter.next();
+//			block.getName();
+//		}
+
+//		DecompInterface decomp = new DecompInterface();
+////		DecompileOptions options = new DecompileOptions();
+////		decomp.setOptions(options);
+//		decomp.openProgram(program);
+//
+//		monitor.setMaximum(importProperties.getSize());
+//		monitor.setProgress(0);
+//
+//		AddressIterator iter = importProperties.getPropertyIterator();
+//		while (iter.hasNext()) {
+//			monitor.checkCanceled();
+//
+//			Address address = iter.next();
+//
+//			ImportProperty importProperty = (ImportProperty) importProperties.get(address);
+//
+//			monitor.setProgress(monitor.getProgress() + 1);
+//			monitor.setMessage(importProperty.getName());
+//
+//			if (importProperty.getType() != ImportType.DATA) {
+//				continue;
+//			}
+//
+//			String name = importProperty.getName();
+//			if (!importPropertiesMap.containsKey(name)) {
+//				importPropertiesMap.put(name, importProperty);
+//			}
+//
+//			importProperty = importPropertiesMap.get(name);
+//
+//			int size = importProperty.getSize();
+//
+//			try {
+//				Address baseAddress = api.toAddr(importProperty.getBaseOffset());
+//				AddressRange addressRange = new AddressRangeImpl(baseAddress, ScriptLoader.importMaxSize);
+//
+//				Function func = api.getFunctionContaining(address);
+//				if (func == null) {
+//					continue;
+//				}
+//
+//				if (!decompCache.containsKey(func)) {
+//					DecompileResults results = decomp.decompileFunction(func, 30, monitor);
+//					if (results == null) {
+//						continue;
+//					}
+//
+//					decompCache.put(func, results);
+//				}
+//
+//				DecompileResults results = decompCache.get(func);
+//				if (!results.decompileCompleted()) {
+//					continue;
+//				}
+//
+//				if (importProperty.getName().equals("region")) {
+//					Variable[] vars = func.getAllVariables();
+//					int d = 0;
+//				}
+//
+//				HighFunction highFunc = results.getHighFunction();
+//				GlobalSymbolMap globalSymbols = highFunc.getGlobalSymbolMap();
+//
+//				Iterator<HighSymbol> symIter = globalSymbols.getSymbols();
+//				while (symIter.hasNext()) {
+//					HighSymbol sym = symIter.next();
+//					SymbolEntry symEntry = sym.getFirstWholeMap();
+//					VariableStorage storage = symEntry.getStorage();
+//					Address addr = storage.getMinAddress();
+//
+////					HighVariable var = sym.getHighVariable();
+////					if (var == null) {
+////						continue;
+////					}
+////
+////					Varnode node = var.getRepresentative();
+////					if (node == null) {
+////						continue;
+////					}
+////
+////					Address addr = node.getAddress();
+//
+//					if (addressRange.contains(addr)) {
+//						long offset = addr.subtract(addressRange.getMinAddress());
+//						if (offset >= size) {
+//							size = (int) (offset + 4);
+//						}
+//					}
+//				}
+//			} catch (Exception e) {
+//				// TODO: handle exception
+//				e.printStackTrace();
+//			}
+//
+//			importProperty.setSize(size);
+//		}
+////
+		// STEP 2. Figure out data import sizes
+//		analyzeImportDataSizes(program, set, monitor, log);
+
+//		long i = 1;
+//		for (Entry<String, ImportProperty> entry : importPropertiesMap.entrySet()) {
+//			ImportProperty importProperty = entry.getValue();
+//
+//			Address importAddress = api.toAddr(importProperty.getBaseOffset());
+//			String importName = importProperty.getName();
+//			ImportType importType = importProperty.getType();
+//			int importSize = importProperty.getSize();
+//
+//			program.getBookmarkManager().setBookmark(importAddress, BookmarkType.ANALYSIS, importType.toString(),
+//					"[" + importSize + "] " + importName);
+//		}
+
+		// STEP 3. Layout imports and change address references
+
+		// STEP 4. Call it a day :-)
+
+		return true;
+	}
+
+//	private void analyzeImportDataSizes(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log) {
+//		/*
+//		 * Similar to "analyzeImportTypes" track MAR register for additions\subtractions
+//		 * and if it's then read\written extend existing data type by how much register
+//		 * was shifted.
+//		 */
+//		Listing listing = program.getListing();
+//
+//		AddressIterator iter = importProperties.getPropertyIterator(set);
+//		while (iter.hasNext()) {
+//			Address address = iter.next();
+//			ImportProperty importProperty = (ImportProperty) importProperties.get(address);
+//
+//			if (importProperty.getType() != ImportType.DATA) {
+//				continue;
+//			}
+//
+//			String name = importProperty.getName();
+//			if (!importPropertiesMap.containsKey(name)) {
+//				importPropertiesMap.put(name, importProperty);
+//			}
+//
+//			importProperty = importPropertiesMap.get(name);
+//
+//			int size = importProperty.getSize();
+//
+//			Instruction instr = listing.getInstructionContaining(address);
+//			try {
+//				Register register = getDestinationRegister(instr);
+//				if (register == null) {
+//					continue;
+//				}
+//
+//				size = doAnalyzeImportDataSize(program, instr.getNext(), register, 0, size);
+//			} catch (Exception e) {
+//				// TODO: handle exception
+//				e.printStackTrace();
+//			}
+//
+//			importProperty.setSize(size);
+//
+//			// NOTE(adm244): it appears that get() returns a copy
+////			importProperties.remove(address);
+////			importProperties.add(address, importProperty);
+//		}
+//	}
+//
+//	private int doAnalyzeImportDataSize(Program program, Instruction instr, Register traceRegister, int offset,
+//			int size) throws MemoryAccessException {
+//		if (instr == null) {
+//			// FIXME(adm244): this shouldn't happen, limit analysis to a function scope
+//			return size;
+//		}
+//
+//		InstructionContext context = instr.getInstructionContext();
+//		ParserContext parserContext = context.getParserContext();
+//		InstructionPrototype prototype = parserContext.getPrototype();
+//
+////		Object[] inputs = prototype.getInputObjects(context);
+////		Object[] outputs = prototype.getResultObjects(context);
+//		PcodeOp[] ops = prototype.getPcode(context, null);
+//
+//		boolean inputsMatch = containsAsInput(ops, traceRegister);
+//		boolean outputsMatch = containsAsOutput(ops, traceRegister);
+//
+//		// TODO(adm244): analyze array access (trace back register value)
+//
+//		// traced register is used as an input into this instruction
+//		if (inputsMatch) {
+//			// NOTE(adm244): assuming it's always first pcode...
+//			PcodeOp op = ops[0];
+//			Varnode inputNode = op.getInput(1);
+//			Register inputRegister = program.getRegister(inputNode);
+//
+//			switch (op.getOpcode()) {
+//			case PcodeOp.INT_ADD:
+//				if (inputNode.isRegister()) {
+//					offset += traceRegisterBackward(instr.getPrevious(), inputRegister);
+//				} else {
+//					offset += inputNode.getOffset();
+//				}
+//				break;
+//			case PcodeOp.INT_SUB:
+//				if (inputNode.isRegister()) {
+//					offset -= traceRegisterBackward(instr.getPrevious(), inputRegister);
+//				} else {
+//					offset -= inputNode.getOffset();
+//				}
+//				break;
+//
+//			case PcodeOp.STORE:
+//			case PcodeOp.LOAD:
+//				if (offset >= size) {
+//					size = offset + 4;
+//				}
+//				break;
+//
+//			default:
+//				break;
+//			}
+//		}
+//
+//		// traced register is used as an output of this instruction
+//		else if (!inputsMatch && outputsMatch) {
+//			// TODO(adm244): possibly multiple registers to track from here
+//			return size;
+//		}
+//
+//		// at this point traced register is either the same or unused
+//
+//		// skip to the next instruction
+//		return doAnalyzeImportDataSize(program, instr.getNext(), traceRegister, offset, size);
+//	}
+//
+//	private int traceRegisterBackward(Instruction instr, Register traceRegister) throws MemoryAccessException {
+//		InstructionContext context = instr.getInstructionContext();
+//		ParserContext parserContext = context.getParserContext();
+//		InstructionPrototype prototype = parserContext.getPrototype();
+//
+//		Object[] inputs = prototype.getInputObjects(context);
+//		Object[] outputs = prototype.getResultObjects(context);
+//
+//		boolean inputsMatch = contains(inputs, traceRegister);
+//		boolean outputsMatch = contains(outputs, traceRegister);
+//
+//		// traced register is used as an input into this instruction
+//		if (inputsMatch && !outputsMatch) {
+//			// ignore
+//		}
+//
+//		// traced register is used as an output of this instruction
+//		else if (!inputsMatch && outputsMatch) {
+//			int type = instr.getOperandType(1);
+//
+//			PcodeOp op = instr.getPcode(0)[0];
+//
+//			switch (op.getOpcode()) {
+////			case 
+//			
+//			case PcodeOp.STORE:
+//				if (type == OperandType.IMMEDIATE) {
+//					return (int) instr.getScalar(1).getValue();
+//				} else if (type == OperandType.REGISTER) {
+//					Register register = instr.getRegister(1);
+//					return traceRegisterBackward(instr.getPrevious(), register);
+//				}
+//				break;
+//			}
+//		}
+//
+//		// at this point traced register is either the same or unused
+//
+//		// skip to the previous instruction
+//		return traceRegisterBackward(instr.getPrevious(), traceRegister);
+//	}
+//
+//	private boolean containsAsInput(PcodeOp[] ops, Register register) {
+//		for (int i = 0; i < ops.length; ++i) {
+//			for (Varnode node : ops[i].getInputs()) {
+//				if (pointsToRegister(node, register)) {
+//					return true;
+//				}
+//			}
+//		}
+//
+//		return false;
+//	}
+//
+//	private boolean containsAsOutput(PcodeOp[] ops, Register register) {
+//		for (int i = 0; i < ops.length; ++i) {
+//			if (pointsToRegister(ops[i].getOutput(), register)) {
+//				return true;
+//			}
+//		}
+//
+//		return false;
+//	}
+//
+//	private boolean pointsToRegister(Varnode node, Register register) {
+//		if (node != null && node.isRegister()) {
+//			if (register != null && node.getAddress().equals(register.getAddress())) {
+//				return true;
+//			}
+//		}
+//
+//		return false;
+//	}
+
+	private void analyzeImportTypes(Program program, AddressSetView set, TaskMonitor monitor, MessageLog log) {
+		/*
+		 * Imported function is never called directly. "farcall" instruction is an
+		 * indirect call.
+		 */
 
 		Listing listing = program.getListing();
 
@@ -97,52 +476,59 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 			Address address = iter.next();
 			ImportProperty importProperty = (ImportProperty) importProperties.get(address);
 
-			/*
-			 * Imported function is never called directly. "farcall" instruction is an
-			 * indirect call.
-			 */
-
 			ImportType type = importProperty.getType();
 
 			Instruction instr = listing.getInstructionContaining(address);
 			try {
-				InstructionContext instrContext = instr.getInstructionContext();
-				ParserContext parserContext = instrContext.getParserContext();
-				InstructionPrototype prototype = parserContext.getPrototype();
-
-				Object[] resultObjects = prototype.getResultObjects(instrContext);
-
-				// NOTE(adm244): should be only one output
-				if (resultObjects.length > 1) {
+				Register register = getDestinationRegister(instr);
+				if (register == null) {
 					continue;
 				}
 
-				// NOTE(adm244): only track registers
-				if (resultObjects[0].getClass() != Register.class) {
-					continue;
-				}
-
-				Register destRegister = (Register) resultObjects[0];
-				type = analyzeImportType(instr.getNext(), destRegister);
+				type = doAnalyzeImportType(instr.getNext(), register);
 			} catch (MemoryAccessException ex) {
 				ex.printStackTrace();
 			}
 
 			importProperty.setType(type);
 
-			String importName = importProperty.getName();
-			ImportType importType = importProperty.getType();
+			// NOTE(adm244): it appears that get() returns a copy
+			importProperties.remove(address);
+			importProperties.add(address, importProperty);
+
+//			String importName = importProperty.getName();
+//			ImportType importType = importProperty.getType();
 
 //			log.appendMsg(
 //					String.format("0x%X: %s, type = %s\n", address.getOffset(), importName, importType.toString()));
 
-			program.getBookmarkManager().setBookmark(address, BookmarkType.ANALYSIS, importType.toString(), importName);
+//			program.getBookmarkManager().setBookmark(address, BookmarkType.ANALYSIS, importType.toString(), importName);
 		}
-
-		return true;
 	}
 
-	private ImportType analyzeImportType(Instruction instr, Register traceRegister) throws MemoryAccessException {
+	private Register getDestinationRegister(Instruction instr) throws MemoryAccessException {
+		InstructionContext instrContext = instr.getInstructionContext();
+		ParserContext parserContext = instrContext.getParserContext();
+		InstructionPrototype prototype = parserContext.getPrototype();
+
+		Object[] resultObjects = prototype.getResultObjects(instrContext);
+
+		// NOTE(adm244): should be only one output
+		if (resultObjects.length > 1) {
+			return null;
+		}
+
+		// NOTE(adm244): only track registers
+		if (resultObjects[0].getClass() != Register.class) {
+			return null;
+		}
+
+		return (Register) resultObjects[0];
+	}
+
+	private ImportType doAnalyzeImportType(Instruction instr, Register traceRegister) throws MemoryAccessException {
+		// TODO(adm244): cache results so that duplicates are not processed again
+
 		if (instr == null) {
 			// FIXME(adm244): this shouldn't happen, limit analysis to a function scope
 			return ImportType.DATA;
@@ -174,14 +560,14 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 
 		// traced register is used as an output of this instruction
 		else if (!inputsMatch && outputsMatch) {
-			// this is the end of a traced register life, assume import is data
+			// this is the end of a traced registers life, assume import is data
 			return ImportType.DATA;
 		}
 
 		// at this point traced register is either the same or unused
 
 		// skip to the next instruction
-		return analyzeImportType(instr.getNext(), traceRegister);
+		return doAnalyzeImportType(instr.getNext(), traceRegister);
 	}
 
 	private boolean contains(Object[] arr, Object obj) {
