@@ -1,0 +1,117 @@
+
+/*
+ * Used to track register currenly holding a specific import.
+ * Register is traced only if it is assigned an import address.
+ */
+TraceTarget:
+    Register register;
+    Import import;
+
+Algorithm example:
+
+cLib_Look$0:
+	[002ae624]
+	    TraceTarget[]: {}
+ 	002ae624 sourceline 0x3c63
+ 	002ae62c thisaddr
+ 	002ae634 sourceline 0x3c64
+	002ae63c mov mar,0x74ef20
+	    TraceTarget[]: {[mar, 0x74ef20]}
+ 	002ae648 memread4 ax
+ 	    Data access (read) at 0x74ef20 for import 0x74ef20
+ 	002ae650 lnot ax
+ 	002ae658 jz 0x002ae6f8
+ 	    spawn multiple basic block analyzers with current state
+
+	[002ae660]
+	    TraceTarget[]: {[mar, 0x74ef20]}
+ 	002ae660 sourceline 0x3c66
+ 	002ae668 push op
+ 	002ae670 mov ax,0x397
+ 	002ae67c farpush ax
+ 	    farcall arg: 1
+ 	002ae684 mov ax,0x64
+ 	002ae690 farpush ax
+        farcall arg: 2
+ 	002ae698 mov ax,0x85
+ 	002ae6a4 farpush ax
+ 	    farcall arg: 3
+ 	002ae6ac mov mar,0x3cef20
+ 	    TraceTarget[]: {[mar, 0x3cef20]}
+ 	002ae6b8 mov ax,mar
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x3cef20]}
+ 	002ae6c4 mov op,ax
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x3cef20], [op, 0x3cef20]}
+ 	002ae6cc setfuncargs 0x3
+ 	002ae6d4 mov ax,0x726f20
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x726f20], [op, 0x3cef20]}
+ 	002ae6e0 farcall ax
+ 	    farcall args: 0
+ 	    TraceTarget[]: {[mar, 0x3cef20], [op, 0x3cef20]}
+ 	002ae6e8 farsubsp 0x3
+ 	002ae6f0 pop op
+ 	    TraceTarget[]: {[mar, 0x3cef20]} ; op value is not an import
+ 	    spawn multiple basic block analyzers with current state
+
+	[002ae6f8]
+	    TraceTarget[]: {[mar, 0x74ef20]}
+ 	002ae6f8 sourceline 0x3c68
+ 	002ae700 mov ax,0x1
+ 	002ae70c mov bx,ax
+ 	002ae718 mov mar,0x3cef20
+ 	    TraceTarget[]: {[mar, 0x3cef20]}
+ 	002ae724 mov ax,mar
+     	TraceTarget[]: {[mar, 0x3cef20], [ax, 0x3cef20]}
+ 	002ae730 push op
+ 	002ae738 mov op,ax
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x3cef20], [op, 0x3cef20]}
+ 	002ae740 farpush bx
+ 	    farcall arg: 1
+ 	002ae748 setfuncargs 0x1
+ 	002ae750 mov ax,0x69ef20
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x69ef20], [op, 0x3cef20]}
+ 	002ae75c farcall ax
+ 	    farcall arg: 0
+ 	    TraceTarget[]: {[mar, 0x3cef20], [op, 0x3cef20]}
+ 	002ae764 farsubsp 0x1
+ 	002ae76c pop op
+ 	    TraceTarget[]: {[mar, 0x3cef20]} ; op value is not an import
+ 	002ae774 sourceline 0x3c69
+ 	002ae77c push op
+ 	002ae784 mov ax,0x2c7f11
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x2c7f11]} ; ax value is an import
+ 	002ae790 farpush ax
+ 	    farcall args: 1
+ 	    Data access (argument) at 0x2c7f11 for import 0x2c7f11
+ 	002ae798 mov ax,0x138
+ 	    TraceTarget[]: {[mar, 0x3cef20]} ; ax value in not an import
+ 	002ae7a4 farpush ax
+ 	    farcall args: 2
+ 	002ae7ac mov ax,0x92
+ 	002ae7b8 farpush ax
+ 	    farcall args: 3
+ 	002ae7c0 mov ax,0x0
+ 	002ae7cc farpush ax
+ 	    farcall args: 4
+ 	002ae7d4 mov mar,0x3cef20
+ 	    TraceTarget[]: {[mar, 0x3cef20]}
+ 	002ae7e0 mov ax,mar
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x3cef20]}
+ 	002ae7ec mov op,ax
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x3cef20], [op, 0x3cef20]}
+ 	002ae7f4 setfuncargs 0x4
+ 	002ae7fc mov ax,0x6aef20
+ 	    TraceTarget[]: {[mar, 0x3cef20], [ax, 0x6aef20], [op, 0x3cef20]}
+ 	002ae808 farcall ax
+ 	    farcall args: 0
+ 	    Data access (farcall) at 0x6aef20 for import 0x6aef20
+ 	    TraceTarget[]: {[mar, 0x3cef20], [op, 0x3cef20]}
+ 	002ae810 farsubsp 0x4
+ 	002ae818 pop op
+ 	    TraceTarget[]: {[mar, 0x3cef20]}
+ 	002ae820 sourceline 0x3c6a
+ 	002ae828 mov ax,0x0
+ 	002ae834 ret
+ 	    TraceTarget[]: {}
+ 	    Analysis finished.
+

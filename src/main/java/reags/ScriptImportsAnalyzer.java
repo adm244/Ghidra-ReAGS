@@ -51,7 +51,14 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 	 * imports types and sizes, also function prototypes, etc.
 	 * 
 	 * We need to trace registers that hold imports and analyze reads, writes and
-	 * accesses to these imports.
+	 * accesses to these imports. This will allow us to determine import type and
+	 * its size (only for portion that is actually accessed in code). It would also
+	 * help to recover function prototypes for near and far calls (op calls too).
+	 * 
+	 * Maybe we should split analyzers that will analyze instructions separately and
+	 * will have their own "state". We would only have a basic analyzing function
+	 * that emulates instructions and calls all analyzers to decide what to do with
+	 * this information...
 	 */
 
 	// TODO(adm244): rename this to function analyzer
