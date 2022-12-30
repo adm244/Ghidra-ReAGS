@@ -15,8 +15,6 @@
  */
 package reags;
 
-import java.util.HashMap;
-
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalysisPriority;
 import ghidra.app.services.AnalyzerType;
@@ -32,13 +30,10 @@ import ghidra.program.model.lang.ParserContext;
 import ghidra.program.model.lang.Processor;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Instruction;
-import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryAccessException;
-import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.FlowType;
-import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.util.ObjectPropertyMap;
 import ghidra.program.model.util.PropertyMapManager;
 import ghidra.util.Saveable;
@@ -51,11 +46,20 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 
 	private static final String PROCESSOR_NAME = "AGSVM";
 
+	/*
+	 * TODO(adm244): write a full function analyzer using a pcode emulator to guess
+	 * imports types and sizes, also function prototypes, etc.
+	 * 
+	 * We need to trace registers that hold imports and analyze reads, writes and
+	 * accesses to these imports.
+	 */
+
+	// TODO(adm244): rename this to function analyzer
 	private static final String NAME = "Script imports analyzer";
 	private static final String DESCRIPTION = "Analyzes usage of imports and determines their types.";
 
 	private ObjectPropertyMap<? extends Saveable> importProperties;
-	private HashMap<String, ImportProperty> importPropertiesMap;
+//	private HashMap<String, ImportProperty> importPropertiesMap;
 
 	public ScriptImportsAnalyzer() {
 		super(NAME, DESCRIPTION, AnalyzerType.INSTRUCTION_ANALYZER);
@@ -93,11 +97,11 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 			throws CancelledException {
 		FlatProgramAPI api = new FlatProgramAPI(program);
 
-//		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
-//		importProperties = propertiesManager.getObjectPropertyMap(ScriptLoader.IMPORT_PROPERTIES);
+		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
+		importProperties = propertiesManager.getObjectPropertyMap(ScriptLoader.IMPORT_PROPERTIES);
 
 		// STEP 1. (DONE) Figure out import type (data or function)
-//		analyzeImportTypes(program, set, monitor, log);
+		analyzeImportTypes(program, set, monitor, log);
 
 		/*
 		 * TODO(adm244):
@@ -148,7 +152,76 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 //		importPropertiesMap = new HashMap<String, ImportProperty>();
 //		HashMap<Function, DecompileResults> decompCache = new HashMap<Function, DecompileResults>();
 
+		// dumps basic blocks of all functions containing data imports
+//		List<Function> processed = new ArrayList<Function>();
 //		BasicBlockModel blockModel = new BasicBlockModel(program, false);
+//		Listing listing = program.getListing();
+//
+//		try {
+//			File file = new File("~/ags/basicblocks.txt");
+//			FileWriter writer = new FileWriter(file);
+//
+//			AddressIterator iter = importProperties.getPropertyIterator();
+//			while (iter.hasNext()) {
+//				Address address = iter.next();
+//
+//				ImportProperty prop = (ImportProperty) importProperties.get(address);
+//				if (prop.getType() == ImportType.DATA) {
+//					Function func = api.getFunctionContaining(address);
+//					if (!processed.contains(func)) {
+//						writer.write(func.getName(true) + ":\n");
+//
+//						CodeBlockIterator blockIter = blockModel.getCodeBlocksContaining(func.getBody(), monitor);
+//						while (blockIter.hasNext()) {
+//							CodeBlock block = blockIter.next();
+//
+//							writer.write(String.format("\t[%s]\n", block.getFirstStartAddress().toString(false, true)));
+//
+//							CodeBlockReferenceIterator blockRefIter = block.getSources(monitor);
+//							while (blockRefIter.hasNext()) {
+//								CodeBlockReference blockRef = blockRefIter.next();
+//								writer.write(
+//										String.format("\t\t%s: %s\n", blockRef.getSourceAddress().toString(false, true),
+//												blockRef.getFlowType().toString()));
+//							}
+//
+//							InstructionIterator instrIter = listing.getInstructions(block, true);
+//							while (instrIter.hasNext()) {
+//								Instruction instr = instrIter.next();
+//
+//								String prefix = " ";
+////								String postfix = "";
+//								// FIXME(adm244): this is incorrect since doesn't highlight all imports
+//								if (instr.contains(address)) {
+//									prefix = "*";
+////									postfix = String.format(" ; %s", prop.getName());
+//								}
+//
+//								writer.write(String.format("%s\t%s %s\n", prefix, instr.getAddressString(false, true),
+//										instr));
+//							}
+//
+//							blockRefIter = block.getDestinations(monitor);
+//							while (blockRefIter.hasNext()) {
+//								CodeBlockReference blockRef = blockRefIter.next();
+//								writer.write(String.format("\t\t%s: %s\n",
+//										blockRef.getDestinationAddress().toString(false, true),
+//										blockRef.getFlowType().toString()));
+//							}
+//
+//							writer.write("\n");
+//						}
+//
+//						processed.add(func);
+//					}
+//				}
+//			}
+//
+//			writer.close();
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+
 //		CodeBlockIterator iter = blockModel.getCodeBlocks(monitor);
 //		while (iter.hasNext()) {
 //			CodeBlock block = iter.next();

@@ -46,10 +46,13 @@ import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.symbol.SymbolTable;
+import ghidra.program.model.util.ObjectPropertyMap;
+import ghidra.program.model.util.PropertyMapManager;
 import ghidra.util.NumericUtilities;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
+import reags.properties.ImportProperty;
 import reags.scom3.Script;
 import reags.scom3.ScriptExport;
 import reags.scom3.ScriptFixup;
@@ -197,10 +200,10 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 
 		Address externalBlockBase = api.toAddr(externalBlockOffset);
 		Map<String, Address> externals = new HashMap<String, Address>();
-//		Program program = api.getCurrentProgram();
-//		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
-//		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
-//				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
+		Program program = api.getCurrentProgram();
+		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
+		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
+				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
 
 		// NOTE(adm244): since we don't know data sizes (except when it's a function
 		// which can be just thunked) we use some magic number for all entries so they
@@ -233,12 +236,12 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 
 //				Address externalAddress = externalBlockBase.add(value * importMaxSize);
 
-//				importProperties.add(codeOffset, new ImportProperty(address.getOffset(), importName));
-
 				// NOTE(adm244): this will be replaced at the later stage
 //				address = Address.NO_ADDRESS;
 //
 				Address externalAddress = externalBlockBase.add(externals.size() * entrySize);
+
+				importProperties.add(codeOffset, new ImportProperty(address.getOffset(), importName));
 //
 				if (externals.containsKey(importName)) {
 					externalAddress = externals.get(importName);
