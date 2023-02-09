@@ -29,13 +29,16 @@ import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.ParserContext;
 import ghidra.program.model.lang.Processor;
 import ghidra.program.model.lang.Register;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.FunctionIterator;
+import ghidra.program.model.listing.FunctionManager;
 import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.symbol.FlowType;
 import ghidra.program.model.util.ObjectPropertyMap;
-import ghidra.program.model.util.PropertyMapManager;
 import ghidra.util.Saveable;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
@@ -45,6 +48,20 @@ import reags.properties.ImportType;
 public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 
 	private static final String PROCESSOR_NAME = "AGSVM";
+
+	/*
+	 * TODO(adm244): implement a custom pcode op for 'farcall' instruction that will
+	 * be used to inject a custom pcode that will take arguments from 'farstack' and
+	 * put them onto real stack and make a standard call, then it will purge the
+	 * stack to get it back to original state.
+	 * 
+	 * This way we separate 'farcall' stack from our real stack using the real stack
+	 * (since we cannot create more than one stack in processor specs).
+	 */
+
+	/*
+	 * NOTE(adm244): "cpool" pcode can be described by extending ConstantPool class.
+	 */
 
 	/*
 	 * TODO(adm244): write a full function analyzer using a pcode emulator to guess
@@ -62,8 +79,8 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 	 */
 
 	// TODO(adm244): rename this to function analyzer
-	private static final String NAME = "Script imports analyzer";
-	private static final String DESCRIPTION = "Analyzes usage of imports and determines their types.";
+	private static final String NAME = "Scom3 Function Analyzer";
+	private static final String DESCRIPTION = "Performs functions analysis with different analyzers.";
 
 	private ObjectPropertyMap<? extends Saveable> importProperties;
 //	private HashMap<String, ImportProperty> importPropertiesMap;
@@ -72,7 +89,7 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 		super(NAME, DESCRIPTION, AnalyzerType.INSTRUCTION_ANALYZER);
 		setDefaultEnablement(true);
 		setSupportsOneTimeAnalysis(false);
-		setPriority(AnalysisPriority.CODE_ANALYSIS);
+		setPriority(AnalysisPriority.FUNCTION_ANALYSIS.after());
 	}
 
 	@Override
@@ -104,11 +121,56 @@ public class ScriptImportsAnalyzer extends AbstractAnalyzer {
 			throws CancelledException {
 		FlatProgramAPI api = new FlatProgramAPI(program);
 
-		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
-		importProperties = propertiesManager.getObjectPropertyMap(ScriptLoader.IMPORT_PROPERTIES);
+//		Listing listing = program.getListing();
+//		FunctionManager functionManager = program.getFunctionManager();
+//
+//		FunctionIterator iter = functionManager.getFunctions(set, true);
+//		while (iter.hasNext()) {
+//			Function func = iter.next();
+//
+//			long farStackSize = 0;
+//
+//			try {
+//				InstructionIterator instrIter = listing.getInstructions(func.getBody(), true);
+//				while (instrIter.hasNext()) {
+//					Instruction instr = instrIter.next();
+//
+//					String mnemonic = instr.getMnemonicString();
+//					int opCount = instr.getNumOperands();
+//					Address addr = instr.;
+//
+//					switch (mnemonic) {
+//					case "farpush":
+//						++farStackSize;
+//						break;
+//
+//					case "farsubsp":
+//						farStackSize -= api.getInt(addr);
+//						if (farStackSize < 0) {
+//							throw new Exception("Far stack underflow!");
+//						}
+//						break;
+//
+//					case "stackptr":
+//						long oldValue = api.getInt(addr);
+//						long value = oldValue + farStackSize;
+//						api.setInt(instr.getAddress(0), (int) value);
+//						break;
+//
+//					default:
+//						break;
+//					}
+//				}
+//			} catch (Exception e) {
+//				e.printStackTrace();
+//			}
+//		}
+
+//		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
+//		importProperties = propertiesManager.getObjectPropertyMap(ScriptLoader.IMPORT_PROPERTIES);
 
 		// STEP 1. (DONE) Figure out import type (data or function)
-		analyzeImportTypes(program, set, monitor, log);
+//		analyzeImportTypes(program, set, monitor, log);
 
 		/*
 		 * TODO(adm244):

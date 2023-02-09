@@ -3,6 +3,20 @@
 <!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/processor_spec.rxg -->
 
 <processor_spec>
-  <programcounter register="pc"/>
-  <!-- <data_space space="data"/> -->
+	<properties>
+		<property key="pcodeInjectLibraryClass" value="reags.pcodeInject.PcodeInjectLibraryScom3" />
+	</properties>
+
+	<programcounter register="pc" />
+
+	<!--<inferptrbounds>
+		<range space="ram" first="0" last="0" />
+	</inferptrbounds>-->
+
+	<register_data>
+		<register name="counter" hidden="true" />
+		<register name="_farsp" hidden="true" />
+		<!--<register name="_paramsp" hidden="true" />-->
+		<!--<register name="_funcArgs" hidden="true" />-->
+	</register_data>
 </processor_spec>

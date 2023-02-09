@@ -39,6 +39,7 @@ import ghidra.program.database.IntRangeMap;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
+import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
@@ -199,8 +200,12 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		long externalBlockOffset = NumericUtilities.getUnsignedAlignedValue(lastBlockOffset + 1, 16);
 
 		Address externalBlockBase = api.toAddr(externalBlockOffset);
+//		Address externalBlockBase = AddressSpace.EXTERNAL_SPACE.getAddress(0);
+		
 		Map<String, Address> externals = new HashMap<String, Address>();
 		Program program = api.getCurrentProgram();
+
+		// FIXME(adm244): use AnalysisStateInfo to store information across analyzers
 		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
 		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
 				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
@@ -282,7 +287,11 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		}
 
 		long externalBlockSize = externals.size() * entrySize;
+//		AddressSpace addrSpace = AddressSpace.EXTERNAL_SPACE;
+//		addrSpace.getAddress(externalBlockSize);
+		
 		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
+//		memory.createInitializedBlock("_external", externalBlockBase, externalBlockSize, (byte) 0xFF, monitor, false);
 //
 		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
 

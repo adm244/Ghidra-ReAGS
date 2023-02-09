@@ -22,14 +22,14 @@
  -->
 
 <compiler_spec>
-    <global>
-        <range space="ram"/>
-    </global>
-    
-    <stackpointer register="sp" space="ram" growth="positive"/>
-    
-    <default_proto>
-        <!-- <prototype name="__agscall" type="stdcall" extrapop="unknown" stackshift="-4">
+	<global>
+		<range space="ram" />
+	</global>
+
+	<stackpointer register="sp" space="ram" growth="positive" />
+
+	<default_proto>
+		<!-- <prototype name="__agscall" type="stdcall" extrapop="unknown" stackshift="-4">
             <input>
                 <pentry minsize="1" maxsize="500" align="4">
                     <addr space="stack" offset="0xFFFFFE08"/>
@@ -59,77 +59,118 @@
             </localrange>
         </prototype> -->
 
-        <prototype name="nearcall" extrapop="unknown" stackshift="-4">
-            <input>
-                <!-- TODO: increase stack size to 250*4; offset=twos(maxsize+4) -->
-                <pentry minsize="4" maxsize="16" align="4">
-                    <addr space="stack" offset="0xFFFFFFEC"/>
-                </pentry>
-            </input>
-            <output>
-                <pentry minsize="1" maxsize="4">
-                    <register name="ax"/>
-                </pentry>
-            </output>
-            <unaffected>
-                <register name="sp"/>
-                <register name="op"/>
-            </unaffected>
-        </prototype>
-    </default_proto>
+		<prototype name="farcall" extrapop="0" stackshift="0">
+			<input>
+				<pentry minsize="1" maxsize="1000" align="4">
+					<addr space="paramStack" offset="4" />
+				</pentry>
+			</input>
+			<output>
+				<pentry minsize="1" maxsize="4">
+					<register name="ax" />
+				</pentry>
+			</output>
+			<unaffected>
+				<register name="sp" />
+				<register name="op" />
+			</unaffected>
+		</prototype>
 
-    <prototype name="nearcallas" extrapop="unknown" stackshift="-4" hasthis="true">
-        <input thisbeforeretpointer="true">
-            <pentry minsize="1" maxsize="4">
-                <register name="op"/>
-            </pentry>
-            <pentry minsize="4" maxsize="16" align="4">
-                <addr space="stack" offset="0xFFFFFFEC"/>
-            </pentry>
-        </input>
-        <output>
-            <pentry minsize="1" maxsize="4">
-                <register name="ax"/>
-            </pentry>
-        </output>
-        <unaffected>
-            <register name="sp"/>
-        </unaffected>
-    </prototype>
 
-    <prototype name="farcall" extrapop="-4" stackshift="-4">
-        <input>
-            <pentry minsize="4" maxsize="16" align="4">
-                <addr space="stack" offset="0xFFFFFFEC"/>
-            </pentry>
-        </input>
-        <output>
-            <pentry minsize="1" maxsize="4">
-                <register name="ax"/>
-            </pentry>
-        </output>
-        <unaffected>
-            <register name="sp"/>
-            <register name="op"/>
-        </unaffected>
-    </prototype>
+	</default_proto>
 
-    <prototype name="farcallas" extrapop="-4" stackshift="-4" hasthis="true">
-        <input thisbeforeretpointer="true">
-            <pentry minsize="1" maxsize="4">
-                <register name="op"/>
-            </pentry>
-            <pentry minsize="4" maxsize="16" align="4">
-                <addr space="stack" offset="0xFFFFFFEC"/>
-            </pentry>
-        </input>
-        <output>
-            <pentry minsize="1" maxsize="4">
-                <register name="ax"/>
-            </pentry>
-        </output>
-        <unaffected>
-            <register name="sp"/>
-        </unaffected>
-    </prototype>
+	<prototype name="nearcall" extrapop="unknown" stackshift="-4">
+		<input>
+			<!-- TODO: increase stack size to 250*4; offset=twos(maxsize+4) -->
+			<pentry minsize="1" maxsize="1000" align="4">
+				<addr space="stack" offset="0xFFFFFC14" />
+			</pentry>
+		</input>
+		<output>
+			<pentry minsize="1" maxsize="4">
+				<register name="ax" />
+			</pentry>
+		</output>
+
+		<pcode inject="uponentry" dynamic="true" />
+
+		<unaffected>
+			<register name="sp" />
+			<register name="op" />
+		</unaffected>
+	</prototype>
+
+	<prototype name="nearcallas" extrapop="unknown" stackshift="-4" hasthis="true">
+		<input thisbeforeretpointer="true">
+			<pentry minsize="1" maxsize="4">
+				<register name="op" />
+			</pentry>
+			<pentry minsize="1" maxsize="1000" align="4">
+				<addr space="stack" offset="0xFFFFFC14" />
+			</pentry>
+		</input>
+		<output>
+			<pentry minsize="1" maxsize="4">
+				<register name="ax" />
+			</pentry>
+		</output>
+
+		<pcode inject="uponentry" dynamic="true" />
+
+		<unaffected>
+			<register name="sp" />
+		</unaffected>
+	</prototype>
+
+	<!-- NOTE(adm244): these are used to generate pcode for functions "prologue" and "epilogue"(?)
+        which is CALLMECHANISM_TYPE in InjectPayload interface -->
+	<!-- <pcode inject="uponentry" dynamic="true"/> -->
+	<!-- <pcode inject="uponreturn" dynamic="true"/> -->
+
+
+
+	<prototype name="farcallas" extrapop="0" stackshift="0" hasthis="true">
+		<input thisbeforeretpointer="true">
+			<pentry minsize="1" maxsize="4">
+				<register name="op" />
+			</pentry>
+			<pentry minsize="1" maxsize="1000" align="4">
+				<addr space="paramStack" offset="4" />
+			</pentry>
+		</input>
+		<output>
+			<pentry minsize="1" maxsize="4">
+				<register name="ax" />
+			</pentry>
+		</output>
+		<unaffected>
+			<register name="sp" />
+		</unaffected>
+	</prototype>
+
+	<callotherfixup targetop="farcallCallOther">
+		<pcode dynamic="true">
+			<!--<input name="arguments_count" />-->
+			<input name="address_register" />
+		</pcode>
+	</callotherfixup>
+
+	<!--<callotherfixup targetop="farpushCallOther">
+		<pcode dynamic="true">
+			<input name="value_register" />
+		</pcode>
+	</callotherfixup>
+
+	<callotherfixup targetop="farsubspCallOther">
+		<pcode dynamic="true">
+			<input name="dummy_register" />
+			<input name="value_immediate" />
+		</pcode>
+	</callotherfixup>-->
+
+	<callotherfixup targetop="setfuncargsCallOther">
+		<pcode dynamic="true">
+			<input name="value_immediate" />
+		</pcode>
+	</callotherfixup>
 </compiler_spec>

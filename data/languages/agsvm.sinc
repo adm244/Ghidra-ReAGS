@@ -6,10 +6,23 @@ define alignment=4;
 
 define space ram type=ram_space size=4 default;
 define space register type=register_space size=4;
+define space farStack type=ram_space size=4;
+define space paramStack type=ram_space size=4;
 
+# general purpose registers
 define register offset=0x00 size=4 [ ax bx cx dx ];
-define register offset=0x20 size=4 [ sp op mar farsp pc bp counter ];
+# special meaning registers
+define register offset=0x14 size=4 [ sp op mar ];
+# utility registers not present in virtual machine
+define register offset=0x20 size=4 [ pc counter _farsp ]; # _farsp _paramsp _funcArgs
 
+# operations used for p-code injection
+define pcodeop farcallCallOther;
+#define pcodeop farpushCallOther;
+#define pcodeop farsubspCallOther;
+define pcodeop setfuncargsCallOther;
+
+# operations used as black-box functions
 define pcodeop strcmp;
 
 #TOKENS
@@ -39,6 +52,31 @@ macro pop(x) {
     x = *:4 sp;
 }
 
+macro farpush(x) {
+    *[farStack]:4 _farsp = x;
+    _farsp = _farsp - 4;
+#    push(x);
+}
+
+#macro farpeek(x, i) {
+#    _pos:4 = _farsp + ((i + 1) * 4);
+#    x = *[farStack]:4 _pos;
+#}
+
+macro farsubsp(x) {
+    _farsp = _farsp + (x * 4);
+#    sp = sp - (x * 4);
+}
+
+#
+#macro parampush(x) {
+#    *[paramStack]:4 _paramsp = x;
+#    _paramsp = _paramsp - 4;
+#}
+#
+#macro paramreset() {
+#    _paramsp = 1000;
+#}
 # Constructors
 dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
     export *:4 rel;
@@ -74,7 +112,6 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
     <word>
     *:2 mar = arg2:2;
-    goto inst_next;
 }
 
 # ret
@@ -235,21 +272,56 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # callext
 :farcall reg1          is opcode=0x21; reg1 {
-    push(&:4 inst_next);
-    call [reg1];
+#    NOTE(adm244): this must be a default push since we don't account for return address
+#    push(&:4 inst_next);
+#    farpush(&:4 inst_next);
+#    reg1 = cpool(0:4, 5:4, reg1);
+#    farcallCallOther(_funcArgs, reg1);
+#    call [reg1];
+# THIS IS A MOCK P-CODE THAT REPRESENTS WHAT INSTRUCTION SHOULD DO. DO _NOT_ USE!
+#    local _addr:4 = reg1;
+#    local _iter:4 = 0;
+#    local _count:4;
+#
+#    if (_funcArgs >= 0) goto <pre_cycle>;
+#
+#    _count = (1000 - _farsp) / 4;
+#    goto <start>;
+#
+#    <pre_cycle>
+#    _count = _funcArgs;
+#
+#    <start>
+#    if (_iter == _count) goto <end>;
+#
+#    farpeek(ax, _iter);
+#    parampush(ax);
+#    _iter = _iter + 1;
+#    goto <start>;
+#
+#    <end>
+#    call [_addr];
+#
+#    paramreset();
+#    _funcArgs = -1;
+    farcallCallOther(reg1);
+#    call [reg1];
 }
 
 # pushreal
 :farpush reg1          is opcode=0x22; reg1 {
-    # pushreal(reg1);
-    push(reg1);
+#    push(reg1);
+    farpush(reg1);
+#    value:4 = reg1;
+#    farpushCallOther(reg1);
 }
 
 # subrealstack
 :farsubsp arg1         is opcode=0x23; arg1 {
-    # subreal(arg1);
-    sp = sp - (arg1 * 4);
-#    farsub(arg1 * 4);
+#    sp = sp - (arg1 * 4);
+#    farsubsp(arg1);
+#    NOTE(adm244): passing 'ax' here so in payload we can ignore symbolic propagator pass
+#    farsubspCallOther(ax, arg1:4);
 }
 
 # linenum
@@ -265,10 +337,14 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 :thisaddr              is opcode=0x26; arg1 {
 #    FIXME(adm244): incorrect address 
 #    bp = arg1;
+#    _farsp = 1000;
+#    _paramsp = 1000;
 }
 
 # numfuncargs
 :setfuncargs arg1      is opcode=0x27; arg1 {
+#    setfuncargsCallOther(arg1:4);
+#    _funcArgs = arg1;
 }
 
 # modreg
