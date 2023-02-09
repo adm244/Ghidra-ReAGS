@@ -27,8 +27,9 @@ import ghidra.program.model.listing.Program;
 
 public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 
+	public static final String MOVLIT = "movlitCallOther";
 	public static final String FARCALL = "farcallCallOther";
-	public static final String FARPUSH = "farpushCallOther";
+//	public static final String FARPUSH = "farpushCallOther";
 //	public static final String FARSUBSP = "farsubspCallOther";
 	public static final String SETFUNCARGS = "setfuncargsCallOther";
 
@@ -38,6 +39,7 @@ public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 		super(language);
 
 		implementedOps = new HashMap<String, InjectPayload>();
+		implementedOps.put(MOVLIT, new InjectMovLit(language, 0x200));
 		implementedOps.put(FARCALL, new InjectFarCall(language, 0x1000));
 //		implementedOps.put(FARPUSH, new InjectFarPush(language, 0x2000));
 //		implementedOps.put(FARSUBSP, new InjectFarSubSp());

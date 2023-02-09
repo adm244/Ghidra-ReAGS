@@ -59,10 +59,11 @@
             </localrange>
         </prototype> -->
 
-		<prototype name="farcall" extrapop="0" stackshift="0">
+		<prototype name="nearcall" extrapop="unknown" stackshift="-4">
 			<input>
+				<!-- TODO: increase stack size to 250*4; offset=twos(maxsize+4) -->
 				<pentry minsize="1" maxsize="1000" align="4">
-					<addr space="paramStack" offset="4" />
+					<addr space="stack" offset="0xFFFFFC14" />
 				</pentry>
 			</input>
 			<output>
@@ -70,35 +71,15 @@
 					<register name="ax" />
 				</pentry>
 			</output>
+
+			<pcode inject="uponentry" dynamic="true" />
+
 			<unaffected>
 				<register name="sp" />
 				<register name="op" />
 			</unaffected>
 		</prototype>
-
-
 	</default_proto>
-
-	<prototype name="nearcall" extrapop="unknown" stackshift="-4">
-		<input>
-			<!-- TODO: increase stack size to 250*4; offset=twos(maxsize+4) -->
-			<pentry minsize="1" maxsize="1000" align="4">
-				<addr space="stack" offset="0xFFFFFC14" />
-			</pentry>
-		</input>
-		<output>
-			<pentry minsize="1" maxsize="4">
-				<register name="ax" />
-			</pentry>
-		</output>
-
-		<pcode inject="uponentry" dynamic="true" />
-
-		<unaffected>
-			<register name="sp" />
-			<register name="op" />
-		</unaffected>
-	</prototype>
 
 	<prototype name="nearcallas" extrapop="unknown" stackshift="-4" hasthis="true">
 		<input thisbeforeretpointer="true">
@@ -127,7 +108,22 @@
 	<!-- <pcode inject="uponentry" dynamic="true"/> -->
 	<!-- <pcode inject="uponreturn" dynamic="true"/> -->
 
-
+	<prototype name="farcall" extrapop="0" stackshift="0">
+		<input>
+			<pentry minsize="1" maxsize="1000" align="4">
+				<addr space="paramStack" offset="4" />
+			</pentry>
+		</input>
+		<output>
+			<pentry minsize="1" maxsize="4">
+				<register name="ax" />
+			</pentry>
+		</output>
+		<unaffected>
+			<register name="sp" />
+			<register name="op" />
+		</unaffected>
+	</prototype>
 
 	<prototype name="farcallas" extrapop="0" stackshift="0" hasthis="true">
 		<input thisbeforeretpointer="true">
@@ -147,6 +143,13 @@
 			<register name="sp" />
 		</unaffected>
 	</prototype>
+
+	<callotherfixup targetop="movlitCallOther">
+		<pcode dynamic="true">
+			<input name="value_immediate" />
+			<output name="value_output" />
+		</pcode>
+	</callotherfixup>
 
 	<callotherfixup targetop="farcallCallOther">
 		<pcode dynamic="true">

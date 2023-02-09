@@ -287,6 +287,22 @@ public class MyPcodeOpEmitter {
 		opList.add(op);
 	}
 
+	public void emitAssignImmediate(Varnode output, Varnode input) {
+		Varnode[] in = new Varnode[1];
+		in[0] = input;
+		PcodeOp op = new PcodeOp(opAddress, seqnum++, PcodeOp.COPY, in, output);
+		opList.add(op);
+	}
+
+	public void emitAssignCPoolRef(Varnode output, Varnode index, String cmd) {
+		Varnode[] in = new Varnode[3];
+		in[0] = getConstant(0, 4);
+		in[1] = index;
+		in[2] = constantOrRegister(cmd);
+		PcodeOp op = new PcodeOp(opAddress, seqnum++, PcodeOp.CPOOLREF, in, output);
+		opList.add(op);
+	}
+
 	/**
 	 * Appends the pcode to assign a register to the result of a pcode op call with
 	 * arguments args

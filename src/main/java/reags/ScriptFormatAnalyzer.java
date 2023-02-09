@@ -17,7 +17,6 @@ package reags;
 
 import java.awt.Color;
 import java.io.IOException;
-import java.util.Iterator;
 
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalysisPriority;
@@ -35,12 +34,9 @@ import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
-import ghidra.program.model.data.DataType;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.Processor;
-import ghidra.program.model.listing.Bookmark;
-import ghidra.program.model.listing.BookmarkManager;
-import ghidra.program.model.listing.BookmarkType;
+import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
@@ -54,6 +50,7 @@ import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
 import reags.scom3.ScriptFixup;
 import reags.scom3.ScriptImport;
+import reags.state.ScriptAnalysisState;
 
 /**
  * TODO: Provide class-level documentation that describes what this analyzer
@@ -113,6 +110,44 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 			throws CancelledException {
 		api = new FlatProgramAPI(program, monitor);
 
+		try {
+			applyFixups(program, monitor);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return true;
+
+//		AddressSpace constSpace = program.getAddressFactory().getConstantSpace();
+//		
+//		ScriptAnalysisState analysisState = getScriptAnalysisState(program);
+//		for (Entry<Address, Integer> entry : analysisState.fixups.entrySet()) {
+//			Address address = entry.getKey();
+//			int type = entry.getValue();
+//
+//			switch (type) {
+//			case ScriptFixup.STRING:
+//				Instruction instr = api.getInstructionContaining(address);
+//				PcodeOp[] ops = instr.getPcode();
+//				
+//				if (ops.length == 1) {
+//					ops[0].setOpcode(PcodeOp.CPOOLREF);
+//					Varnode offsetNode = ops[0].getInput(0);
+//					Varnode zero = new Varnode(constSpace.getAddress(0), 4);
+//					Varnode cpoolString = new Varnode(constSpace.getAddress(244), 4);
+//					
+//					ops[0].removeInput(0);
+//					
+//					ops[0].insertInput(zero, 0);
+//					ops[0].insertInput(offsetNode, 1);
+//					ops[0].insertInput(cpoolString, 2);
+//				}
+//				
+//				break;
+//			}
+//		}
+
 //		BookmarkManager bookmarkManager = program.getBookmarkManager();
 //
 //		// NOTE(adm244): this creates memory references for imported data/functions
@@ -156,7 +191,7 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 //			e.printStackTrace();
 //		}
 
-		return false;
+//		return false;
 	}
 
 	private boolean diassembleFunctions(Program program, TaskMonitor monitor) {
@@ -179,11 +214,11 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 	private boolean applyFixups(Program program, TaskMonitor monitor) throws IOException, Exception {
 		Memory memory = program.getMemory();
 
-		MemoryBlock dataBlock = memory.getBlock(".data");
-		MemoryBlock codeBlock = memory.getBlock(".code");
-		MemoryBlock stringsBlock = memory.getBlock(".strings");
-		MemoryBlock fixupsBlock = memory.getBlock(".fixups");
-		MemoryBlock importsBlock = memory.getBlock(".imports");
+		MemoryBlock dataBlock = memory.getBlock("data");
+		MemoryBlock codeBlock = memory.getBlock("code");
+		MemoryBlock stringsBlock = memory.getBlock("strings");
+		MemoryBlock fixupsBlock = memory.getBlock("fixups");
+		MemoryBlock importsBlock = memory.getBlock("imports");
 
 		if (fixupsBlock == null) {
 			return false;
@@ -192,12 +227,16 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		ScriptFixup[] fixups = readFixups(fixupsBlock);
 		ScriptImport[] imports = readImports(importsBlock);
 
+		ScriptAnalysisState state = ScriptAnalysisState.getState(program);
+
 		// FIXME(adm244): instead of calculating many offsets here, calculate them in
 		// *.slaspec
 		// e.g. ":jmp abs is opcode=??; arg1 [ abs = inst_next + arg1 * 4 ] { ... }"
 		// this will output an absolute address for a jump instruction: "jmp 0x12345"
 
 		// NOTE(adm244): jmp instructions: address(instr.next()) + (arg1 * 4)
+
+//		AddressSpace constSpace = program.getAddressFactory().getConstantSpace();
 
 		for (int i = 0; i < fixups.length; ++i) {
 			byte type = fixups[i].getType();
@@ -206,29 +245,34 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 			Address codeOffset = codeBlock.getStart().add(offset * 4);
 			Instruction instr = api.getInstructionContaining(codeOffset);
 			int opindex = (int) ((codeOffset.getOffset() - instr.getAddress().getOffset()) / 4) - 1;
-			int value = api.getInt(codeOffset);
+			long value = api.getInt(codeOffset);
+
+			state.fixups.put(instr.getAddress(), (int) type);
 
 			if (type == ScriptFixup.STRING && stringsBlock != null) {
 				Address stringsOffset = stringsBlock.getStart().add(value);
-				instr.addOperandReference(opindex, stringsOffset, RefType.READ, SourceType.IMPORTED);
-				api.createAsciiString(stringsOffset);
+
+				Data stringData = api.createAsciiString(stringsOffset);
+				state.strings.put(value, (String) stringData.getValue());
+
+				instr.addOperandReference(opindex, stringsOffset, RefType.READ, SourceType.ANALYSIS);
 			} else if (type == ScriptFixup.IMPORT && importsBlock != null) {
-				Address importsOffset = importsBlock.getStart().add(imports[value].getOffset());
-				instr.addOperandReference(opindex, importsOffset, RefType.READ, SourceType.IMPORTED);
-				api.createAsciiString(importsOffset);
+//				Address importsOffset = importsBlock.getStart().add(imports[value].getOffset());
+//				instr.addOperandReference(opindex, importsOffset, RefType.READ, SourceType.IMPORTED);
+//				api.createAsciiString(importsOffset);
 			} else if (type == ScriptFixup.FUNCTION) {
-				setBackgroundColor(program, instr.getAddress(), Color.YELLOW);
-//				Address funcAddr = codeBlock.getStart().add(value * 4);
-//				instr.addOperandReference(opindex, funcAddr, RefType.INDIRECTION, SourceType.IMPORTED);
+				Address funcAddr = codeBlock.getStart().add(value * 4);
+				instr.addOperandReference(opindex, funcAddr, RefType.INDIRECTION, SourceType.IMPORTED);
+//				setBackgroundColor(program, instr.getAddress(), Color.YELLOW);
 			} else if (type == ScriptFixup.STACK) {
 				// TODO(adm244): handle this case
 				api.createBookmark(instr.getAddress(), "STACK", "STACK fixup detected");
 				setBackgroundColor(program, instr.getAddress(), Color.RED);
 			} else if (type == ScriptFixup.DATA && dataBlock != null) {
-//			setBackgroundColor(program, instr.getAddress(), Color.YELLOW);
 				Address dataOffset = dataBlock.getStart().add(value);
-				instr.addOperandReference(opindex, dataOffset, RefType.DATA, SourceType.IMPORTED);
-				api.createData(dataOffset, DataType.DEFAULT);
+				instr.addOperandReference(opindex, dataOffset, RefType.DATA, SourceType.ANALYSIS);
+//				setBackgroundColor(program, instr.getAddress(), Color.YELLOW);
+//				api.createData(dataOffset, DataType.DEFAULT);
 			} else if (type == ScriptFixup.DATAPOINTER && dataBlock != null) {
 				// TODO(adm244): handle this case
 				api.createBookmark(instr.getAddress(), "DATAPOINTER", "DATAPOINTER fixup detected");

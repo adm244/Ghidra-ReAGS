@@ -13,6 +13,7 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.model.pcode.PcodeOp;
 import reags.state.FarStackAnalysisState;
 import reags.state.FunctionState;
+import reags.state.ScriptAnalysisState;
 
 public class InjectPayloadFarStack extends InjectPayloadCallother {
 

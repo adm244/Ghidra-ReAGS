@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import ghidra.app.plugin.core.analysis.AnalysisStateInfo;
 import ghidra.app.util.Option;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
@@ -59,6 +60,8 @@ import reags.scom3.ScriptExport;
 import reags.scom3.ScriptFixup;
 import reags.scom3.ScriptImport;
 import reags.scom3.ScriptMemoryBlock;
+import reags.state.FarStackAnalysisState;
+import reags.state.ScriptAnalysisState;
 
 /**
  * TODO: Provide class-level documentation that describes what this loader does.
@@ -136,7 +139,7 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			createMemoryBlocks(api, script, loadSpec.getDesiredImageBase());
 
 			// STEP 2. Modify code section such that all offsets outside are absolute
-			applyFixups(api, memory, script, monitor);
+//			applyFixups(api, memory, script, monitor);
 
 			// STEP 3. Mark all exported data and functions with their names
 			createExports(api, memory, script);
@@ -201,7 +204,7 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 
 		Address externalBlockBase = api.toAddr(externalBlockOffset);
 //		Address externalBlockBase = AddressSpace.EXTERNAL_SPACE.getAddress(0);
-		
+
 		Map<String, Address> externals = new HashMap<String, Address>();
 		Program program = api.getCurrentProgram();
 
@@ -223,6 +226,8 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		 * "game", "palette", "hotspot", "region", "dialog", "gui", "GUI"
 		 */
 
+//		ScriptAnalysisState analysisState = getScriptAnalysisState(program);
+
 		for (int i = 0; i < fixups.length; ++i) {
 			byte type = fixups[i].getType();
 			int offset = fixups[i].getOffset();
@@ -232,8 +237,11 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 
 			Address address = api.toAddr(value);
 
+//			analysisState.fixups.put(codeOffset, (int) type);
+
 			if (type == ScriptFixup.STRING) {
 				address = stringsBlock.getStart().add(value);
+				api.createBookmark(codeOffset, "STRING", String.format("%x", value));
 			}
 
 			else if (type == ScriptFixup.IMPORT) {
@@ -283,14 +291,14 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 				setBackgroundColor(api, codeOffset, Color.RED);
 			}
 
-			api.setInt(codeOffset, (int) address.getOffset());
+//			api.setInt(codeOffset, (int) address.getOffset());
 		}
 
 		long externalBlockSize = externals.size() * entrySize;
 //		AddressSpace addrSpace = AddressSpace.EXTERNAL_SPACE;
 //		addrSpace.getAddress(externalBlockSize);
-		
-		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
+
+//		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
 //		memory.createInitializedBlock("_external", externalBlockBase, externalBlockSize, (byte) 0xFF, monitor, false);
 //
 		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
@@ -300,9 +308,9 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 			String externalName = external.getKey();
 
 			// NOTE(adm244): this just adds named locations into IMPORTS folder
-			externalManager.addExtLocation(Library.UNKNOWN, externalName, null, SourceType.IMPORTED);
+//			externalManager.addExtLocation(Library.UNKNOWN, externalName, null, SourceType.IMPORTED);
 //
-			api.createLabel(externalAddress, externalName, true, SourceType.IMPORTED);
+//			api.createLabel(externalAddress, externalName, true, SourceType.IMPORTED);
 
 			/*
 			 * TODO: Mark all functions called with farcall as external (code is below)

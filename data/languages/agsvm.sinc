@@ -21,6 +21,7 @@ define pcodeop farcallCallOther;
 #define pcodeop farpushCallOther;
 #define pcodeop farsubspCallOther;
 define pcodeop setfuncargsCallOther;
+define pcodeop movlitCallOther;
 
 # operations used as black-box functions
 define pcodeop strcmp;
@@ -122,7 +123,8 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # littoreg
 :mov reg1, arg2        is opcode=0x06; reg1; arg2 {
-    reg1 = arg2;
+#    reg1 = arg2;
+    reg1 = movlitCallOther(arg2:4);
 }
 
 # memread
