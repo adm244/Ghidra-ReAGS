@@ -228,12 +228,15 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 	private ImportType analyzeImportType(Instruction entry, TaskMonitor monitor) {
 		// TODO(adm244): analyze import type
 		try {
+			// TODO(adm244): track multiple result objects (if any)
 //			List<Object> trackingObjects = new ArrayList<Object>();
 //			Collections.addAll(trackingObjects, entry.getResultObjects());
 			Object trackingObject = entry.getResultObjects()[0];
 
 			CodeBlock entryBlock = basicBlockModel.getFirstCodeBlockContaining(entry.getAddress(), monitor);
 			AddressSetView addressRange = new AddressSet(entry.getNext().getAddress(), entryBlock.getMaxAddress());
+
+			// TODO(adm244): analyze multiple basic blocks
 
 			InstructionIterator instrIter = listing.getInstructions(addressRange, true);
 			while (instrIter.hasNext()) {
@@ -351,8 +354,10 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 						externals.put(importName, externalAddress);
 					}
 
-					state.functions.put(value, externalAddress);
-					
+					if (!state.functions.containsKey(value)) {
+						state.functions.put(value, externalAddress);
+					}
+
 					instr.addOperandReference(opindex, externalAddress, RefType.INDIRECTION, SourceType.ANALYSIS);
 				} else {
 					fixupType = FixupType.IMPORT_DATA;
@@ -415,10 +420,13 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 			String name = state.imports.get(funcSet.getKey());
 
 			Function externalFunction = api.createFunction(addr, name);
-			ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, name, null,
-					SourceType.ANALYSIS);
+			if (externalFunction != null) {
+				ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, name, null,
+						SourceType.ANALYSIS);
 
-			externalFunction.setThunkedFunction(externalLocation.getFunction());
+				externalFunction.setThunkedFunction(externalLocation.getFunction());
+				externalFunction.setCallingConvention("farcall");
+			}
 		}
 
 		return true;

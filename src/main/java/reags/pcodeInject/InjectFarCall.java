@@ -1,18 +1,12 @@
 package reags.pcodeInject;
 
 import ghidra.app.plugin.processors.sleigh.SleighLanguage;
-import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.InjectContext;
 import ghidra.program.model.lang.Register;
-import ghidra.program.model.listing.Function;
-import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
-import ghidra.program.model.symbol.ExternalLocation;
-import ghidra.program.model.symbol.ExternalManager;
-import ghidra.program.model.symbol.SourceType;
 import reags.state.FunctionState;
 
 public class InjectFarCall extends InjectPayloadFarStack {
@@ -30,38 +24,18 @@ public class InjectFarCall extends InjectPayloadFarStack {
 	@Override
 	public PcodeOp[] getPcode(Program program, InjectContext context) {
 		// NOTE(adm244): ignore symbolic propagator call
-		if (!context.inputlist.get(0).isRegister()) {
-			// FIXME(adm244): remove this (since this should be in a loader code)
-			FlatProgramAPI api = new FlatProgramAPI(program);
-
-			long offset = context.inputlist.get(0).getOffset();
-
-			try {
-				Address externalAddress = api.toAddr(offset);
-
-				if (api.getFunctionAt(externalAddress) == null) {
-					Function externalFunction = api.createFunction(externalAddress, null);
-
-					ExternalManager externalManager = program.getExternalManager();
-					ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN,
-							externalFunction.getName(), null, SourceType.IMPORTED);
-
-					externalFunction.setThunkedFunction(externalLocation.getFunction());
-				}
-			} catch (Exception e) {
-				// TODO: handle exception
-			}
-
-			return new PcodeOp[0];
-		}
+//		if (!context.inputlist.get(0).isRegister()) {
+//			return new PcodeOp[0];
+//		}
 
 		MyPcodeOpEmitter pCode = new MyPcodeOpEmitter(language, context.baseAddr, uniqueBase);
 
-//		Address address = getFunctionAddress(program, context);
-//		FunctionState state = getFunctionState(program, address);
+		Address address = getFunctionAddress(program, context);
+		FunctionState state = getFunctionState(program, address);
 
-//		int argumentsCount = state.getArgumentsCount();
-		int argumentsCount = 1;
+		// FIXME(adm244): this is always -1 for some reason!
+		int argumentsCount = state.getArgumentsCount();
+//		int argumentsCount = 1;
 		// TODO(adm244): handle the case when argumentsCount is not set
 
 		int totalSize = 1000;
@@ -72,9 +46,16 @@ public class InjectFarCall extends InjectPayloadFarStack {
 			totalSize -= 4;
 		}
 
-		Varnode registerNode = context.inputlist.get(0);
-		Register register = program.getRegister(registerNode);
-		pCode.emitIndirectCall(register.getName());
+		if (!context.inputlist.get(0).isRegister()) {
+			// symbolic propagation pass
+			Varnode addressNode = context.inputlist.get(0);
+			pCode.emitDirectCall(addressNode);
+		} else {
+			// decompiler callback pass
+			Varnode registerNode = context.inputlist.get(0);
+			Register register = program.getRegister(registerNode);
+			pCode.emitIndirectCall(register.getName());
+		}
 
 		return pCode.getPcodeOps();
 

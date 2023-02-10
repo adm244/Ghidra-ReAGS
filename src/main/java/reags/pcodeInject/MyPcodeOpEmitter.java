@@ -371,6 +371,13 @@ public class MyPcodeOpEmitter {
 		opList.add(op);
 	}
 
+	public void emitDirectCall(Varnode targetNode) {
+		Varnode[] in = new Varnode[1];
+		in[0] = targetNode;
+		PcodeOp op = new PcodeOp(opAddress, seqnum++, PcodeOp.CALL, in);
+		opList.add(op);
+	}
+
 	/**
 	 * Appends the pcode to sign-extend the value src into dest
 	 * 
