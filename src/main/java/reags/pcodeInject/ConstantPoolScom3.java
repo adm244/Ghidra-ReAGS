@@ -1,6 +1,7 @@
 package reags.pcodeInject;
 
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressSpace;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.lang.ConstantPool;
 import ghidra.program.model.listing.Program;
@@ -10,16 +11,21 @@ import reags.state.ScriptAnalysisState;
 
 public class ConstantPoolScom3 extends ConstantPool {
 
+	private static final int POINTER_SIZE = 4;
 	private static final int INSTRUCTION_SIZE = 4;
 
 	public static final String CPOOL_DATA = "1";
 	public static final String CPOOL_FUNCTION = "2";
 	public static final String CPOOL_STRING = "3";
+	public static final String CPOOL_IMPORT_DATA = "4";
+	public static final String CPOOL_IMPORT_FUNCTION = "5";
 
 	private Program program;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
 	private ScriptAnalysisState scriptState;
+
+	private AddressSpace externalSpace;
 
 	public ConstantPoolScom3(Program program) {
 		this.program = program;
@@ -29,6 +35,12 @@ public class ConstantPoolScom3 extends ConstantPool {
 		dataBlock = memory.getBlock("data");
 		codeBlock = memory.getBlock("code");
 		scriptState = ScriptAnalysisState.getState(program);
+
+		externalSpace = AddressSpace.EXTERNAL_SPACE;
+	}
+	
+	private String getType(String name) {
+		return null;
 	}
 
 	// ref array does not include the first element passed to the cpool operator.
@@ -57,6 +69,37 @@ public class ConstantPoolScom3 extends ConstantPool {
 		case CPOOL_STRING:
 			fillStringLiteral(record, index);
 			break;
+
+		case CPOOL_IMPORT_DATA: {
+//			address = externalBlock.getStart().add(index * POINTER_SIZE);
+			String name = scriptState.imports.get(index);
+//			address = externalSpace.getAddress(index * POINTER_SIZE);
+//			fillPrimitive(record, address, name);
+			
+			// TODO(adm244): get type name from 'name' if any, otherwise it's a simple type
+			String type = getType(name);
+
+			// TODO(adm244): get DataType or create it then assign pointer to it
+			// this way we don't need to hold the data in memory and can change its size
+
+			record.tag = ConstantPool.POINTER_FIELD;
+			record.token = "DATA:" + name;
+			record.type = PointerDataType.dataType;
+			break;
+		}
+
+		case CPOOL_IMPORT_FUNCTION: {
+			String name = scriptState.imports.get(index);
+			address = scriptState.functions.get(index);
+			fillPrimitive(record, address, name);
+
+			// TODO(adm244): create a function pointer
+
+//			record.tag = ConstantPool.POINTER_METHOD;
+//			record.token = "FUNCTION:" + name;
+//			record.type = PointerDataType.dataType;
+			break;
+		}
 
 //		case "5":
 //			record.tag = ConstantPool.POINTER_METHOD;

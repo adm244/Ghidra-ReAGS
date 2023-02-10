@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package reags;
+package reags.analyzers;
 
 import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalysisPriority;
@@ -42,6 +42,7 @@ import ghidra.program.model.util.ObjectPropertyMap;
 import ghidra.util.Saveable;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
+import reags.ScriptLoader;
 import reags.properties.ImportProperty;
 import reags.properties.ImportType;
 
