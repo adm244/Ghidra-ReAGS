@@ -60,6 +60,7 @@ import ghidra.util.task.TaskMonitor;
 import reags.ScriptLoader;
 import reags.scom3.ScriptFixup;
 import reags.scom3.ScriptImport;
+import reags.state.ExternalFunction;
 import reags.state.ScriptAnalysisState;
 
 /**
@@ -263,10 +264,42 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 				}
 			}
 		} catch (CancelledException e) {
-			e.printStackTrace();
+			// do nothing...
 		}
 
 		return ImportType.DATA;
+	}
+
+	private boolean analyzeHasThis(Instruction entry, TaskMonitor monitor) {
+		try {
+			CodeBlock entryBlock = basicBlockModel.getFirstCodeBlockContaining(entry.getAddress(), monitor);
+			AddressSetView addressRange = new AddressSet(entryBlock.getMinAddress(), entry.getPrevious().getAddress());
+
+			InstructionIterator iter = listing.getInstructions(addressRange, false);
+			while (iter.hasNext()) {
+				Instruction instr = iter.next();
+
+				// NOTE(adm244): "initobj" instruction is valid until "farcall" is executed;
+				// once "initobj" is encountered the next "farcall" is guaranteed to have "this"
+				// pointer
+				switch (instr.getMnemonicString()) {
+				case "farcall":
+					return false;
+
+				case "initobj":
+					return true;
+
+				default:
+					break;
+				}
+			}
+
+			// TODO(adm244): analyze all source basic blocks...
+		} catch (CancelledException e) {
+			// do nothing...
+		}
+
+		return false;
 	}
 
 	private boolean applyFixups(Program program, TaskMonitor monitor) throws IOException, Exception {
@@ -287,6 +320,7 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 
 		ScriptAnalysisState state = ScriptAnalysisState.getState(program);
 		HashMap<Long, ImportType> importTypeCache = new HashMap<Long, ImportType>();
+		HashMap<Long, Boolean> hasThisCache = new HashMap<Long, Boolean>();
 
 		// FIXME(adm244): instead of calculating many offsets here, calculate them in
 		// *.slaspec
@@ -354,8 +388,18 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 						externals.put(importName, externalAddress);
 					}
 
+					boolean hasThis;
+
+					if (hasThisCache.containsKey(value)) {
+						hasThis = hasThisCache.get(value);
+					} else {
+						hasThis = analyzeHasThis(instr, monitor);
+					}
+
 					if (!state.functions.containsKey(value)) {
-						state.functions.put(value, externalAddress);
+						// TODO(adm244): analyze for "hasThis" value
+						// (backwards search "initobj" instruction)
+						state.functions.put(value, new ExternalFunction(externalAddress, importName, hasThis));
 					}
 
 					instr.addOperandReference(opindex, externalAddress, RefType.INDIRECTION, SourceType.ANALYSIS);
@@ -417,17 +461,15 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
 
 		// ### CREATE EXTERNAL FUNCTION DEFINITION ###
-		for (Entry<Long, Address> funcSet : state.functions.entrySet()) {
-			Address addr = funcSet.getValue();
-			String name = state.imports.get(funcSet.getKey());
-
-			Function externalFunction = api.createFunction(addr, name);
+		for (Entry<Long, ExternalFunction> funcSet : state.functions.entrySet()) {
+			ExternalFunction entry = funcSet.getValue();
+			Function externalFunction = api.createFunction(entry.getAddress(), entry.getName());
 			if (externalFunction != null) {
-				ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, name, null,
-						SourceType.ANALYSIS);
+				ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN,
+						externalFunction.getName(), null, SourceType.ANALYSIS);
 
 				externalFunction.setThunkedFunction(externalLocation.getFunction());
-				externalFunction.setCallingConvention("farcall");
+				externalFunction.setCallingConvention(entry.hasThis() ? "farcallas" : "farcall");
 			}
 		}
 

@@ -6,6 +6,7 @@ import ghidra.program.model.lang.ConstantPool;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
+import reags.state.ExternalFunction;
 import reags.state.ScriptAnalysisState;
 
 public class ConstantPoolScom3 extends ConstantPool {
@@ -88,9 +89,9 @@ public class ConstantPoolScom3 extends ConstantPool {
 		}
 
 		case CPOOL_IMPORT_FUNCTION: {
-			String name = scriptState.imports.get(index);
-			address = scriptState.functions.get(index);
-			fillPrimitive(record, address, name);
+//			String name = scriptState.imports.get(index);
+			ExternalFunction function = scriptState.functions.get(index);
+			fillPrimitive(record, function.getAddress(), function.getName());
 
 			// TODO(adm244): create a function pointer
 
