@@ -23,24 +23,20 @@ public class InjectFarCall extends InjectPayloadFarStack {
 
 	@Override
 	public PcodeOp[] getPcode(Program program, InjectContext context) {
-		// NOTE(adm244): ignore symbolic propagator call
-//		if (!context.inputlist.get(0).isRegister()) {
-//			return new PcodeOp[0];
-//		}
-
 		MyPcodeOpEmitter pCode = new MyPcodeOpEmitter(language, context.baseAddr, uniqueBase);
 
 		Address address = getFunctionAddress(program, context);
 		FunctionState state = getFunctionState(program, address);
 
-		// FIXME(adm244): this is always -1 for some reason!
 		int argumentsCount = state.getArgumentsCount();
-//		int argumentsCount = 1;
-		// TODO(adm244): handle the case when argumentsCount is not set
+		if (argumentsCount < 0) {
+			// TODO(adm244): handle the case when argumentsCount is not set
+			// (this might be a big problem actually...)
+		}
 
 		int totalSize = 1000;
 		for (int i = 0; i < argumentsCount; ++i) {
-			pCode.emitPopCat1Value(PARAMETER + Integer.toString(i));
+			pCode.emitPeekValue(PARAMETER + Integer.toString(i), i + 1, 4);
 			pCode.emitWriteToMemory(PARAM_SPACE, 4, Integer.toString(totalSize) + ":4",
 					PARAMETER + Integer.toString(i));
 			totalSize -= 4;
@@ -58,128 +54,128 @@ public class InjectFarCall extends InjectPayloadFarStack {
 		}
 
 		return pCode.getPcodeOps();
+	}
 
-//		List<PcodeOp> ops = new ArrayList<PcodeOp>();
+//	List<PcodeOp> ops = new ArrayList<PcodeOp>();
 //
-//		Address address = getFunctionAddress(program, context);
-//		FunctionState state = getFunctionState(program, address);
+//	Address address = getFunctionAddress(program, context);
+//	FunctionState state = getFunctionState(program, address);
 //
-////		synchronized (state) {
-//		int argumentsCount = state.getArgumentsCount();
-////		Stack<Varnode> stack = state.getFarStack();
+////	synchronized (state) {
+//	int argumentsCount = state.getArgumentsCount();
+////	Stack<Varnode> stack = state.getFarStack();
 //
-//		// FIXME(adm244): the problem here is that inputlist contains registers and not
-//		// values they're holding. Maybe we should utilize "cpool" or read\write into
-//		// special memory directly?
+//	// FIXME(adm244): the problem here is that inputlist contains registers and not
+//	// values they're holding. Maybe we should utilize "cpool" or read\write into
+//	// special memory directly?
 //
-////		int argumentsCount = (int) context.inputlist.get(0).getOffset();
-////		long calleeOffset = context.inputlist.get(1).getOffset();
+////	int argumentsCount = (int) context.inputlist.get(0).getOffset();
+////	long calleeOffset = context.inputlist.get(1).getOffset();
 //
-//		// if there were no "setfuncargs" instruction before "farcall" use all arguments
-//		// pushed onto the stack (according to agsvm behavior)
-//		if (argumentsCount < 0) {
-////			argumentsCount = stack.size();
-//			return null;
-//		}
+//	// if there were no "setfuncargs" instruction before "farcall" use all arguments
+//	// pushed onto the stack (according to agsvm behavior)
+//	if (argumentsCount < 0) {
+////		argumentsCount = stack.size();
+//		return null;
+//	}
 //
-//		// move arguments into farstack address space
-//		AddressSpace space = program.getAddressFactory().getAddressSpace("paramStack");
-//		AddressSpace farStackSpace = program.getAddressFactory().getAddressSpace("farStack");
-//		AddressSpace constSpace = program.getAddressFactory().getConstantSpace();
-//		AddressSpace uniqueSpace = program.getAddressFactory().getUniqueSpace();
-////		AddressSpace registerSpace = program.getAddressFactory().getRegisterSpace();
+//	// move arguments into farstack address space
+//	AddressSpace space = program.getAddressFactory().getAddressSpace("paramStack");
+//	AddressSpace farStackSpace = program.getAddressFactory().getAddressSpace("farStack");
+//	AddressSpace constSpace = program.getAddressFactory().getConstantSpace();
+//	AddressSpace uniqueSpace = program.getAddressFactory().getUniqueSpace();
+////	AddressSpace registerSpace = program.getAddressFactory().getRegisterSpace();
 //
-//		Register regFarStack = program.getRegister("_farsp");
-//		Varnode farsp = new Varnode(regFarStack.getAddress(), regFarStack.getBitLength() / 8);
+//	Register regFarStack = program.getRegister("_farsp");
+//	Varnode farsp = new Varnode(regFarStack.getAddress(), regFarStack.getBitLength() / 8);
 //
-//		int base = 0;
+//	int base = 0;
 //
-////		Varnode[] args = new Varnode[argumentsCount + 1];
-////		args[0] = context.inputlist.get(0);
+////	Varnode[] args = new Varnode[argumentsCount + 1];
+////	args[0] = context.inputlist.get(0);
+//
+////	{
+////		Varnode out = new Varnode(uniqueSpace.getAddress(1024410), 4);
+////		Varnode[] in = new Varnode[2];
+////		in[0] = new Varnode(constSpace.getAddress(registerSpace.getSpaceID()), 4);
+////		in[1] = context.inputlist.get(0);
+////	
+////		ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.LOAD, in, out));
+////		
+////		args[0] = out;
+////	}
+//
+//	for (int i = 0; i < argumentsCount; ++i) {
+////		Varnode out = new Varnode(space.getAddress(1000 - (i * 4)), 4);
+//		Varnode out = new Varnode(uniqueSpace.getAddress(context.baseAddr.getOffset() + (i * 4)), 4);
+//		Varnode param = new Varnode(uniqueSpace.getAddress(context.baseAddr.getOffset() + 2000 + (i * 4)), 4);
+//
+//		// out = farsp - (4 * (i + 1))
+//		// param[i] = out
 //
 ////		{
-////			Varnode out = new Varnode(uniqueSpace.getAddress(1024410), 4);
 ////			Varnode[] in = new Varnode[2];
-////			in[0] = new Varnode(constSpace.getAddress(registerSpace.getSpaceID()), 4);
-////			in[1] = context.inputlist.get(0);
-////		
-////			ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.LOAD, in, out));
-////			
-////			args[0] = out;
-////		}
-//
-//		for (int i = 0; i < argumentsCount; ++i) {
-////			Varnode out = new Varnode(space.getAddress(1000 - (i * 4)), 4);
-//			Varnode out = new Varnode(uniqueSpace.getAddress(context.baseAddr.getOffset() + (i * 4)), 4);
-//			Varnode param = new Varnode(uniqueSpace.getAddress(context.baseAddr.getOffset() + 2000 + (i * 4)), 4);
-//
-//			// out = farsp - (4 * (i + 1))
-//			// param[i] = out
-//
-////			{
-////				Varnode[] in = new Varnode[2];
-////				in[0] = new Varnode(constSpace.getAddress(i + 1), 4);
-////				in[1] = new Varnode(constSpace.getAddress(4), 4);
+////			in[0] = new Varnode(constSpace.getAddress(i + 1), 4);
+////			in[1] = new Varnode(constSpace.getAddress(4), 4);
 ////
-////				ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.INT_MULT, in, out));
-////			}
-//			{
-//				Varnode[] in14 = new Varnode[2];
-//				in14[0] = farsp;
-////				in14[1] = new Varnode(constSpace.getAddress((i + 1) * 4), 4);
-//				in14[1] = new Varnode(constSpace.getAddress(4), 4);
+////			ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.INT_MULT, in, out));
+////		}
+//		{
+//			Varnode[] in14 = new Varnode[2];
+//			in14[0] = farsp;
+////			in14[1] = new Varnode(constSpace.getAddress((i + 1) * 4), 4);
+//			in14[1] = new Varnode(constSpace.getAddress(4), 4);
 //
-//				ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.INT_SUB, in14, farsp));
-//			}
-//			{
-//				Varnode[] in = new Varnode[2];
-//				in[0] = new Varnode(constSpace.getAddress(farStackSpace.getSpaceID()), 4);
-//				in[1] = farsp;
+//			ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.INT_SUB, in14, farsp));
+//		}
+//		{
+//			Varnode[] in = new Varnode[2];
+//			in[0] = new Varnode(constSpace.getAddress(farStackSpace.getSpaceID()), 4);
+//			in[1] = farsp;
 //
-//				ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.LOAD, in, param));
-//			}
-//
-////			args[i + 1] = out;
-//
-//			Varnode[] in = new Varnode[3];
-//
-//			in[0] = new Varnode(constSpace.getAddress(space.getSpaceID()), 4);
-//			in[1] = new Varnode(constSpace.getAddress(1000 - (i * 4)), 4);
-//
-//			// FIXME(adm244): sadly, we cannot use stack here, because it holds a register
-//			// and not its value, so every argument becomes the same here... :(
-////			in[2] = stack.get(stack.size() - 1 - i);
-//
-//			// FIXME(adm244): temporary function params
-////			in[2] = new Varnode(constSpace.getAddress(i + 1), 4);
-//			in[2] = param;
-//
-//			ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.STORE, in));
+//			ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.LOAD, in, param));
 //		}
 //
-////		// ### CALLIND dx
-//		Varnode[] in = new Varnode[1];
-////
-//////			AddressSpace registerSpace = program.getAddressFactory().getRegisterSpace();
-//////			Address addr = registerSpace.getAddress(context.inputlist.get(1).getOffset());
-//////			
-//////			Register register = program.getRegister("ax");
-//////			Address addr = register.getAddress();
-////
-////		Address addr = program.getAddressFactory().getDefaultAddressSpace().getAddress(calleeOffset);
-////		in[0] = new Varnode(addr, addr.getPointerSize());
-//		in[0] = context.inputlist.get(0);
-////
-//		ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.CALLIND, in));
-////			ops.add(new PcodeOp(context.baseAddr, base, PcodeOp.CALL, in));
+////		args[i + 1] = out;
 //
-//		// invalidate argumentsCount, but don't touch the stack
-//		state.setArgumentsCount(FunctionState.INVALID_ARGS);
-////		}
+//		Varnode[] in = new Varnode[3];
 //
-//		return getPcodeOps(ops);
-//		return new PcodeOp[0];
-	}
+//		in[0] = new Varnode(constSpace.getAddress(space.getSpaceID()), 4);
+//		in[1] = new Varnode(constSpace.getAddress(1000 - (i * 4)), 4);
+//
+//		// FIXME(adm244): sadly, we cannot use stack here, because it holds a register
+//		// and not its value, so every argument becomes the same here... :(
+////		in[2] = stack.get(stack.size() - 1 - i);
+//
+//		// FIXME(adm244): temporary function params
+////		in[2] = new Varnode(constSpace.getAddress(i + 1), 4);
+//		in[2] = param;
+//
+//		ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.STORE, in));
+//	}
+//
+////	// ### CALLIND dx
+//	Varnode[] in = new Varnode[1];
+////
+//////		AddressSpace registerSpace = program.getAddressFactory().getRegisterSpace();
+//////		Address addr = registerSpace.getAddress(context.inputlist.get(1).getOffset());
+//////		
+//////		Register register = program.getRegister("ax");
+//////		Address addr = register.getAddress();
+////
+////	Address addr = program.getAddressFactory().getDefaultAddressSpace().getAddress(calleeOffset);
+////	in[0] = new Varnode(addr, addr.getPointerSize());
+//	in[0] = context.inputlist.get(0);
+////
+//	ops.add(new PcodeOp(context.baseAddr, base++, PcodeOp.CALLIND, in));
+////		ops.add(new PcodeOp(context.baseAddr, base, PcodeOp.CALL, in));
+//
+//	// invalidate argumentsCount, but don't touch the stack
+//	state.setArgumentsCount(FunctionState.INVALID_ARGS);
+////	}
+//
+//	return getPcodeOps(ops);
+//	return new PcodeOp[0];
 
 //	Varnode node = context.inputlist.get(0);
 ////Register register = program.getRegister(node);

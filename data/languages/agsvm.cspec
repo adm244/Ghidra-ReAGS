@@ -9,7 +9,8 @@
         since "extrapop" is "unknown" but it doesn't work even when there's
         no function arguments that it expects to be passed into it...
     
-    - For now farcall and call stacks are the same and it seems to work fine
+    - (SOLVED) PROBLEM:
+        For now farcall and call stacks are the same and it seems to work fine
         for unoptimized assembly outputed by the classic AGS compiler, but
         if something is pushed onto the stack after farpush instruction
         (ether optimized or manually written code) the parameter order for
@@ -18,10 +19,32 @@
         I guess we could introduce another "stack pointer" register and use
         it for farpush, farcall and farsubsp instructions...
         The problem here is that Ghidra's analysis will be wrong in this case,
-        right?
+        right? Also, parameters order is reversed.
+        
+      SOLUTION:
+        Ended up using two temporary memory spaces: "farStack" and "paramStack".
+        "farStack" is used to store data pushed and poped with "farpush" and "farsubsp"
+        instructions as is (implemented directly in Sleigh).
+        "paramStack" is used to actually pass arguments into a farcall'd function by
+        using a p-code injection for "farcall" instruction which copies N arguments
+        from a top of "farStack" to "paramStack" and makes a call.
+        The arguments count (N) is determined by "setfuncargs" instruction or by a
+        number of pushed arguments onto "farStack" if there's no such instruction
+        (like in very old SCOM3 versions)
  -->
 
 <compiler_spec>
+	<data_organization>
+		<char_type signed="false" />
+		<char_size value="1" />
+		<short_size value="2" />
+		<pointer_size value="4" />
+		<integer_size value="4" />
+		<float_size value="4" />
+		<long_size value="4" />
+		<double_size value="4" />
+	</data_organization>
+
 	<global>
 		<range space="ram" />
 	</global>
@@ -77,6 +100,13 @@
 			<unaffected>
 				<register name="sp" />
 				<register name="op" />
+
+				<!-- NOTE(adm244): if specified for all prototypes makes sure that high-variables 
+				won't be created for assosiated memory addresses;
+				Not sure if it's _THE_ best solution, but it sure works and
+				decompiler properly marks "farStack" as temporary storage
+				(search "int4 ActionRestrictLocal::apply(Funcdata &data)" in "coreaction.cc" for more info) -->
+				<register name="_farsp" />
 			</unaffected>
 		</prototype>
 	</default_proto>
@@ -100,6 +130,7 @@
 
 		<unaffected>
 			<register name="sp" />
+			<register name="_farsp" />
 		</unaffected>
 	</prototype>
 
@@ -122,6 +153,7 @@
 		<unaffected>
 			<register name="sp" />
 			<register name="op" />
+			<register name="_farsp" />
 		</unaffected>
 	</prototype>
 
@@ -141,6 +173,7 @@
 		</output>
 		<unaffected>
 			<register name="sp" />
+			<register name="_farsp" />
 		</unaffected>
 	</prototype>
 

@@ -412,9 +412,11 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 			}
 		}
 
+		// ### CREATE EXTERNALS MEMORY BLOCK ###
 		long externalBlockSize = externals.size() * entrySize;
 		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
 
+		// ### CREATE EXTERNAL FUNCTION DEFINITION ###
 		for (Entry<Long, Address> funcSet : state.functions.entrySet()) {
 			Address addr = funcSet.getValue();
 			String name = state.imports.get(funcSet.getKey());

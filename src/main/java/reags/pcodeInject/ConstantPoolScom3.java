@@ -1,7 +1,6 @@
 package reags.pcodeInject;
 
 import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressSpace;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.lang.ConstantPool;
 import ghidra.program.model.listing.Program;
@@ -11,7 +10,7 @@ import reags.state.ScriptAnalysisState;
 
 public class ConstantPoolScom3 extends ConstantPool {
 
-	private static final int POINTER_SIZE = 4;
+//	private static final int POINTER_SIZE = 4;
 	private static final int INSTRUCTION_SIZE = 4;
 
 	public static final String CPOOL_DATA = "1";
@@ -20,15 +19,15 @@ public class ConstantPoolScom3 extends ConstantPool {
 	public static final String CPOOL_IMPORT_DATA = "4";
 	public static final String CPOOL_IMPORT_FUNCTION = "5";
 
-	private Program program;
+//	private Program program;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
 	private ScriptAnalysisState scriptState;
 
-	private AddressSpace externalSpace;
+//	private AddressSpace externalSpace;
 
 	public ConstantPoolScom3(Program program) {
-		this.program = program;
+//		this.program = program;
 
 		Memory memory = program.getMemory();
 
@@ -36,12 +35,12 @@ public class ConstantPoolScom3 extends ConstantPool {
 		codeBlock = memory.getBlock("code");
 		scriptState = ScriptAnalysisState.getState(program);
 
-		externalSpace = AddressSpace.EXTERNAL_SPACE;
+//		externalSpace = AddressSpace.EXTERNAL_SPACE;
 	}
-	
-	private String getType(String name) {
-		return null;
-	}
+
+//	private String getType(String name) {
+//		return null;
+//	}
 
 	// ref array does not include the first element passed to the cpool operator.
 	// ref[0] is the constant pool index
@@ -75,9 +74,9 @@ public class ConstantPoolScom3 extends ConstantPool {
 			String name = scriptState.imports.get(index);
 //			address = externalSpace.getAddress(index * POINTER_SIZE);
 //			fillPrimitive(record, address, name);
-			
+
 			// TODO(adm244): get type name from 'name' if any, otherwise it's a simple type
-			String type = getType(name);
+//			String type = getType(name);
 
 			// TODO(adm244): get DataType or create it then assign pointer to it
 			// this way we don't need to hold the data in memory and can change its size

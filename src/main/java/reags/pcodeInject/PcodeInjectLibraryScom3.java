@@ -29,8 +29,6 @@ public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 
 	public static final String MOVLIT = "movlitCallOther";
 	public static final String FARCALL = "farcallCallOther";
-//	public static final String FARPUSH = "farpushCallOther";
-//	public static final String FARSUBSP = "farsubspCallOther";
 	public static final String SETFUNCARGS = "setfuncargsCallOther";
 
 	public Map<String, InjectPayload> implementedOps;
@@ -39,10 +37,8 @@ public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 		super(language);
 
 		implementedOps = new HashMap<String, InjectPayload>();
-		implementedOps.put(MOVLIT, new InjectMovLit(language, 0x200));
-		implementedOps.put(FARCALL, new InjectFarCall(language, 0x1000));
-//		implementedOps.put(FARPUSH, new InjectFarPush(language, 0x2000));
-//		implementedOps.put(FARSUBSP, new InjectFarSubSp());
+		implementedOps.put(MOVLIT, new InjectMovLit(language, 0x1000));
+		implementedOps.put(FARCALL, new InjectFarCall(language, 0x2000));
 		implementedOps.put(SETFUNCARGS, new InjectSetFuncArgs(language, 0x3000));
 	}
 
@@ -56,7 +52,7 @@ public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 	public PcodeInjectLibrary clone() {
 		return new PcodeInjectLibraryScom3(this);
 	}
-	
+
 	@Override
 	public InjectPayload allocateInject(String sourceName, String name, int type) {
 		if (type == InjectPayload.CALLMECHANISM_TYPE) {
