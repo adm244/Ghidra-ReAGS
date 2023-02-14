@@ -21,6 +21,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 	public static final String CPOOL_IMPORT_FUNCTION = "5";
 
 //	private Program program;
+//	private DataTypeManager dtManager;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
 	private ScriptAnalysisState scriptState;
@@ -31,6 +32,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 //		this.program = program;
 
 		Memory memory = program.getMemory();
+//		dtManager = program.getDataTypeManager();
 
 		dataBlock = memory.getBlock("data");
 		codeBlock = memory.getBlock("code");
@@ -96,8 +98,22 @@ public class ConstantPoolScom3 extends ConstantPool {
 			// TODO(adm244): create a function pointer
 
 //			record.tag = ConstantPool.POINTER_METHOD;
-//			record.token = "FUNCTION:" + name;
-//			record.type = PointerDataType.dataType;
+//			record.token = "FUNCTION:" + function.getName();
+//
+//			DataType dt = dtManager.getDataType(new DataTypePath("/external/functions", record.token));
+//			if (dt == null) {
+//				FunctionDefinitionDataType funcDef = new FunctionDefinitionDataType(function.getFunction(), true);
+//				funcDef.setCategoryPath(new CategoryPath("/external/functions"));
+//
+////				ParameterDefinitionImpl[] funcArgs = new ParameterDefinitionImpl[function.getArgumentsCount()];
+////				funcDef.setArguments(funcArgs);
+//
+//				int id = dtManager.startTransaction("function creation");
+//				dtManager.addDataType(funcDef, DataTypeConflictHandler.DEFAULT_HANDLER);
+//				dtManager.endTransaction(id, true);
+//			}
+//
+//			record.type = new PointerDataType(dt);
 			break;
 		}
 

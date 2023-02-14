@@ -224,17 +224,17 @@ public class MyPcodeOpEmitter {
 		op = new PcodeOp(opAddress, seqnum++, PcodeOp.LOAD, in, out);
 		opList.add(op);
 	}
-	
+
 	public void emitPeekValue(String destName, int offset, int size) {
 		Varnode out = findVarnode(destName, 4);
 		Varnode temp = findVarnode("_temp", 4);
-		
+
 		Varnode[] in = new Varnode[2];
 		in[0] = spVarnode;
 		in[1] = new Varnode(constSpace.getAddress(offset * size), 4);
 		PcodeOp op = new PcodeOp(opAddress, seqnum++, PcodeOp.INT_SUB, in, temp);
 		opList.add(op);
-		
+
 		in = new Varnode[2];
 		in[0] = farStackSpaceId;
 		in[1] = temp;
@@ -298,6 +298,14 @@ public class MyPcodeOpEmitter {
 	 */
 	public void emitAssignConstantToRegister(String register, int constant) {
 		Varnode out = findRegister(register);
+		Varnode[] in = new Varnode[1];
+		in[0] = getConstant(constant, out.getSize());
+		PcodeOp op = new PcodeOp(opAddress, seqnum++, PcodeOp.COPY, in, out);
+		opList.add(op);
+	}
+
+	public void emitAssignConstant(String name, int constant, int size) {
+		Varnode out = findVarnode(name, size);
 		Varnode[] in = new Varnode[1];
 		in[0] = getConstant(constant, out.getSize());
 		PcodeOp op = new PcodeOp(opAddress, seqnum++, PcodeOp.COPY, in, out);

@@ -15,18 +15,13 @@
  */
 package reags;
 
-import java.awt.Color;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 
-import ghidra.app.plugin.core.analysis.AnalysisStateInfo;
 import ghidra.app.util.Option;
 import ghidra.app.util.bin.BinaryReader;
 import ghidra.app.util.bin.ByteProvider;
@@ -34,34 +29,21 @@ import ghidra.app.util.bin.InputStreamByteProvider;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.app.util.opinion.AbstractProgramWrapperLoader;
 import ghidra.app.util.opinion.LoadSpec;
-import ghidra.app.util.viewer.listingpanel.PropertyBasedBackgroundColorModel;
 import ghidra.framework.model.DomainObject;
-import ghidra.program.database.IntRangeMap;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
-import ghidra.program.model.lang.Register;
-import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
-import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.program.model.symbol.SymbolTable;
-import ghidra.program.model.util.ObjectPropertyMap;
-import ghidra.program.model.util.PropertyMapManager;
 import ghidra.util.NumericUtilities;
 import ghidra.util.exception.CancelledException;
-import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
-import reags.properties.ImportProperty;
 import reags.scom3.Script;
 import reags.scom3.ScriptExport;
-import reags.scom3.ScriptFixup;
-import reags.scom3.ScriptImport;
 import reags.scom3.ScriptMemoryBlock;
-import reags.state.FarStackAnalysisState;
-import reags.state.ScriptAnalysisState;
 
 /**
  * TODO: Provide class-level documentation that describes what this loader does.
@@ -76,7 +58,7 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 	private static final String SCOM3_COMPILER_ID = "default";
 	private static final long IMAGE_BASE = 0x100000;
 
-	public static int importMaxSize = 32768;
+//	public static int importMaxSize = 32768;
 
 	/*
 	 * TODO: DO THIS FIRST: figure out in the analyzer what is an imported function,
@@ -185,164 +167,164 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 		}
 	}
 
-	private void applyFixups(FlatProgramAPI api, Memory memory, Script script, TaskMonitor monitor) throws Exception {
-		MemoryBlock fixupsBlock = memory.getBlock("fixups");
-		if (fixupsBlock == null) {
-			return;
-		}
-
-		MemoryBlock dataBlock = memory.getBlock("data");
-		MemoryBlock codeBlock = memory.getBlock("code");
-		MemoryBlock stringsBlock = memory.getBlock("strings");
-		MemoryBlock importsBlock = memory.getBlock("imports");
-
-		ScriptFixup[] fixups = readFixups(fixupsBlock);
-		ScriptImport[] imports = readImports(importsBlock);
-
-		long lastBlockOffset = memory.getMaxAddress().getUnsignedOffset();
-		long externalBlockOffset = NumericUtilities.getUnsignedAlignedValue(lastBlockOffset + 1, 16);
-
-		Address externalBlockBase = api.toAddr(externalBlockOffset);
-//		Address externalBlockBase = AddressSpace.EXTERNAL_SPACE.getAddress(0);
-
-		Map<String, Address> externals = new HashMap<String, Address>();
-		Program program = api.getCurrentProgram();
-
-		// FIXME(adm244): use AnalysisStateInfo to store information across analyzers
-		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
-		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
-				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
-
-		// NOTE(adm244): since we don't know data sizes (except when it's a function
-		// which can be just thunked) we use some magic number for all entries so they
-		// won't (mostly) overlap each other. Maybe a better solution would be matching
-		// imports name against a predefined set to figure out it's size first and then
-		// analyze data usage to guess all user-defined data sizes...
-		int entrySize = 32768;
-
-		/*
-		 * These are reserved script names according to classic compilers source:
-		 * "inventory", "character", "views", "player", "object", "mouse", "system",
-		 * "game", "palette", "hotspot", "region", "dialog", "gui", "GUI"
-		 */
-
-//		ScriptAnalysisState analysisState = getScriptAnalysisState(program);
-
-		for (int i = 0; i < fixups.length; ++i) {
-			byte type = fixups[i].getType();
-			int offset = fixups[i].getOffset();
-
-			Address codeOffset = codeBlock.getStart().add(offset * 4);
-			int value = api.getInt(codeOffset);
-
-			Address address = api.toAddr(value);
-
-//			analysisState.fixups.put(codeOffset, (int) type);
-
-			if (type == ScriptFixup.STRING) {
-				address = stringsBlock.getStart().add(value);
-				api.createBookmark(codeOffset, "STRING", String.format("%x", value));
-			}
-
-			else if (type == ScriptFixup.IMPORT) {
-				String importName = imports[value].getName();
-
-//				Address externalAddress = externalBlockBase.add(value * importMaxSize);
-
-				// NOTE(adm244): this will be replaced at the later stage
-//				address = Address.NO_ADDRESS;
+//	private void applyFixups(FlatProgramAPI api, Memory memory, Script script, TaskMonitor monitor) throws Exception {
+//		MemoryBlock fixupsBlock = memory.getBlock("fixups");
+//		if (fixupsBlock == null) {
+//			return;
+//		}
 //
-				Address externalAddress = externalBlockBase.add(externals.size() * entrySize);
-
-				importProperties.add(codeOffset, new ImportProperty(address.getOffset(), importName));
+//		MemoryBlock dataBlock = memory.getBlock("data");
+//		MemoryBlock codeBlock = memory.getBlock("code");
+//		MemoryBlock stringsBlock = memory.getBlock("strings");
+//		MemoryBlock importsBlock = memory.getBlock("imports");
 //
-				if (externals.containsKey(importName)) {
-					externalAddress = externals.get(importName);
-				} else {
-					externals.put(importName, externalAddress);
-				}
+//		ScriptFixup[] fixups = readFixups(fixupsBlock);
+//		ScriptImport[] imports = readImports(importsBlock);
 //
-				address = externalAddress;
+//		long lastBlockOffset = memory.getMaxAddress().getUnsignedOffset();
+//		long externalBlockOffset = NumericUtilities.getUnsignedAlignedValue(lastBlockOffset + 1, 16);
 //
-//				api.getCurrentProgram().getBookmarkManager().setBookmark(codeOffset, BookmarkType.INFO, "IMPORT",
-//						String.format("%x", value));
+//		Address externalBlockBase = api.toAddr(externalBlockOffset);
+////		Address externalBlockBase = AddressSpace.EXTERNAL_SPACE.getAddress(0);
 //
-////				api.createBookmark(codeOffset, "IMPORT", String.format("%x", value));
-////				setBackgroundColor(api, codeOffset, Color.YELLOW);
-			}
-
-			else if (type == ScriptFixup.FUNCTION) {
-				address = codeBlock.getStart().add(value * 4);
-			}
-
-			else if (type == ScriptFixup.DATA) {
-				address = dataBlock.getStart().add(value);
-			}
-
-			else if (type == ScriptFixup.DATAPOINTER) {
-				// TODO(adm244): handle this case
-				api.createBookmark(codeOffset, "DATAPOINTER", "DATAPOINTER fixup detected");
-				setBackgroundColor(api, codeOffset, Color.ORANGE);
-			}
-
-			else if (type == ScriptFixup.STACK) {
-				// TODO(adm244): handle this case
-				api.createBookmark(codeOffset, "STACK", "STACK fixup detected");
-				setBackgroundColor(api, codeOffset, Color.RED);
-			}
-
-//			api.setInt(codeOffset, (int) address.getOffset());
-		}
-
-		long externalBlockSize = externals.size() * entrySize;
-//		AddressSpace addrSpace = AddressSpace.EXTERNAL_SPACE;
-//		addrSpace.getAddress(externalBlockSize);
-
-//		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
-//		memory.createInitializedBlock("_external", externalBlockBase, externalBlockSize, (byte) 0xFF, monitor, false);
+//		Map<String, Address> externals = new HashMap<String, Address>();
+//		Program program = api.getCurrentProgram();
 //
-		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
-
-		for (Entry<String, Address> external : externals.entrySet()) {
-			Address externalAddress = external.getValue();
-			String externalName = external.getKey();
-
-			// NOTE(adm244): this just adds named locations into IMPORTS folder
-//			externalManager.addExtLocation(Library.UNKNOWN, externalName, null, SourceType.IMPORTED);
+//		// FIXME(adm244): use AnalysisStateInfo to store information across analyzers
+//		PropertyMapManager propertiesManager = program.getUsrPropertyManager();
+//		ObjectPropertyMap<ImportProperty> importProperties = propertiesManager
+//				.createObjectPropertyMap(IMPORT_PROPERTIES, ImportProperty.class);
 //
-//			api.createLabel(externalAddress, externalName, true, SourceType.IMPORTED);
-
-			/*
-			 * TODO: Mark all functions called with farcall as external (code is below)
-			 */
-
-			// TODO(adm244): move this into analyzer, I guess...
-//			Function externalFunction = api.createFunction(externalAddress, externalName);
-//			ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, externalName, null,
-//					SourceType.IMPORTED);
+//		// NOTE(adm244): since we don't know data sizes (except when it's a function
+//		// which can be just thunked) we use some magic number for all entries so they
+//		// won't (mostly) overlap each other. Maybe a better solution would be matching
+//		// imports name against a predefined set to figure out it's size first and then
+//		// analyze data usage to guess all user-defined data sizes...
+//		int entrySize = 32768;
 //
-//			externalFunction.setThunkedFunction(externalLocation.getFunction());
-
-			// NOTE(adm244): external entry point means that this address is exported !!!
-//			api.getCurrentProgram().getSymbolTable().addExternalEntryPoint(externalAddress);
-		}
-	}
+//		/*
+//		 * These are reserved script names according to classic compilers source:
+//		 * "inventory", "character", "views", "player", "object", "mouse", "system",
+//		 * "game", "palette", "hotspot", "region", "dialog", "gui", "GUI"
+//		 */
+//
+////		ScriptAnalysisState analysisState = getScriptAnalysisState(program);
+//
+//		for (int i = 0; i < fixups.length; ++i) {
+//			byte type = fixups[i].getType();
+//			int offset = fixups[i].getOffset();
+//
+//			Address codeOffset = codeBlock.getStart().add(offset * 4);
+//			int value = api.getInt(codeOffset);
+//
+//			Address address = api.toAddr(value);
+//
+////			analysisState.fixups.put(codeOffset, (int) type);
+//
+//			if (type == ScriptFixup.STRING) {
+//				address = stringsBlock.getStart().add(value);
+//				api.createBookmark(codeOffset, "STRING", String.format("%x", value));
+//			}
+//
+//			else if (type == ScriptFixup.IMPORT) {
+//				String importName = imports[value].getName();
+//
+////				Address externalAddress = externalBlockBase.add(value * importMaxSize);
+//
+//				// NOTE(adm244): this will be replaced at the later stage
+////				address = Address.NO_ADDRESS;
+////
+//				Address externalAddress = externalBlockBase.add(externals.size() * entrySize);
+//
+//				importProperties.add(codeOffset, new ImportProperty(address.getOffset(), importName));
+////
+//				if (externals.containsKey(importName)) {
+//					externalAddress = externals.get(importName);
+//				} else {
+//					externals.put(importName, externalAddress);
+//				}
+////
+//				address = externalAddress;
+////
+////				api.getCurrentProgram().getBookmarkManager().setBookmark(codeOffset, BookmarkType.INFO, "IMPORT",
+////						String.format("%x", value));
+////
+//////				api.createBookmark(codeOffset, "IMPORT", String.format("%x", value));
+//////				setBackgroundColor(api, codeOffset, Color.YELLOW);
+//			}
+//
+//			else if (type == ScriptFixup.FUNCTION) {
+//				address = codeBlock.getStart().add(value * 4);
+//			}
+//
+//			else if (type == ScriptFixup.DATA) {
+//				address = dataBlock.getStart().add(value);
+//			}
+//
+//			else if (type == ScriptFixup.DATAPOINTER) {
+//				// TODO(adm244): handle this case
+//				api.createBookmark(codeOffset, "DATAPOINTER", "DATAPOINTER fixup detected");
+//				setBackgroundColor(api, codeOffset, Color.ORANGE);
+//			}
+//
+//			else if (type == ScriptFixup.STACK) {
+//				// TODO(adm244): handle this case
+//				api.createBookmark(codeOffset, "STACK", "STACK fixup detected");
+//				setBackgroundColor(api, codeOffset, Color.RED);
+//			}
+//
+////			api.setInt(codeOffset, (int) address.getOffset());
+//		}
+//
+//		long externalBlockSize = externals.size() * entrySize;
+////		AddressSpace addrSpace = AddressSpace.EXTERNAL_SPACE;
+////		addrSpace.getAddress(externalBlockSize);
+//
+////		memory.createUninitializedBlock("_external", externalBlockBase, externalBlockSize, false);
+////		memory.createInitializedBlock("_external", externalBlockBase, externalBlockSize, (byte) 0xFF, monitor, false);
+////
+//		ExternalManager externalManager = api.getCurrentProgram().getExternalManager();
+//
+//		for (Entry<String, Address> external : externals.entrySet()) {
+//			Address externalAddress = external.getValue();
+//			String externalName = external.getKey();
+//
+//			// NOTE(adm244): this just adds named locations into IMPORTS folder
+////			externalManager.addExtLocation(Library.UNKNOWN, externalName, null, SourceType.IMPORTED);
+////
+////			api.createLabel(externalAddress, externalName, true, SourceType.IMPORTED);
+//
+//			/*
+//			 * TODO: Mark all functions called with farcall as external (code is below)
+//			 */
+//
+//			// TODO(adm244): move this into analyzer, I guess...
+////			Function externalFunction = api.createFunction(externalAddress, externalName);
+////			ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN, externalName, null,
+////					SourceType.IMPORTED);
+////
+////			externalFunction.setThunkedFunction(externalLocation.getFunction());
+//
+//			// NOTE(adm244): external entry point means that this address is exported !!!
+////			api.getCurrentProgram().getSymbolTable().addExternalEntryPoint(externalAddress);
+//		}
+//	}
 
 	// FIXME(adm244): move to utils
-	private void setBackgroundColor(FlatProgramAPI api, Address address, Color color) {
-		Program program = api.getCurrentProgram();
-
-		IntRangeMap map = program.getIntRangeMap(PropertyBasedBackgroundColorModel.COLOR_PROPERTY_NAME);
-		if (map == null) {
-			try {
-				map = program.createIntRangeMap(PropertyBasedBackgroundColorModel.COLOR_PROPERTY_NAME);
-			} catch (DuplicateNameException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-		map.setValue(address, address, color.getRGB());
-	}
+//	private void setBackgroundColor(FlatProgramAPI api, Address address, Color color) {
+//		Program program = api.getCurrentProgram();
+//
+//		IntRangeMap map = program.getIntRangeMap(PropertyBasedBackgroundColorModel.COLOR_PROPERTY_NAME);
+//		if (map == null) {
+//			try {
+//				map = program.createIntRangeMap(PropertyBasedBackgroundColorModel.COLOR_PROPERTY_NAME);
+//			} catch (DuplicateNameException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//		}
+//		map.setValue(address, address, color.getRGB());
+//	}
 
 	private void createExports(FlatProgramAPI api, Memory memory, Script script) throws IOException, Exception {
 		SymbolTable symbolTable = api.getCurrentProgram().getSymbolTable();
@@ -372,42 +354,42 @@ public class ScriptLoader extends AbstractProgramWrapperLoader {
 	}
 
 	// TODO(adm244): read this inside Script object instead
-	private ScriptFixup[] readFixups(MemoryBlock memoryBlock) throws IOException {
-		ByteProvider provider = new InputStreamByteProvider(memoryBlock.getData(), memoryBlock.getSize());
-		BinaryReader reader = new BinaryReader(provider, true);
-
-		int count = reader.readNextInt();
-		ScriptFixup[] fixups = new ScriptFixup[count];
-
-		for (int i = 0; i < fixups.length; ++i) {
-			fixups[i] = new ScriptFixup();
-			fixups[i].setType(reader.readNextByte());
-		}
-
-		for (int i = 0; i < fixups.length; ++i) {
-			fixups[i].setOffset(reader.readNextInt());
-		}
-
-		return fixups;
-	}
-
-	// TODO(adm244): read this inside Script object instead
-	private ScriptImport[] readImports(MemoryBlock memoryBlock) throws IOException {
-		ByteProvider provider = new InputStreamByteProvider(memoryBlock.getData(), memoryBlock.getSize());
-		BinaryReader reader = new BinaryReader(provider, true);
-
-		int count = reader.readNextInt();
-		ScriptImport[] imports = new ScriptImport[count];
-
-		for (int i = 0; i < imports.length; ++i) {
-			long offset = reader.getPointerIndex();
-			String name = reader.readNextAsciiString();
-
-			imports[i] = new ScriptImport(name, offset);
-		}
-
-		return imports;
-	}
+//	private ScriptFixup[] readFixups(MemoryBlock memoryBlock) throws IOException {
+//		ByteProvider provider = new InputStreamByteProvider(memoryBlock.getData(), memoryBlock.getSize());
+//		BinaryReader reader = new BinaryReader(provider, true);
+//
+//		int count = reader.readNextInt();
+//		ScriptFixup[] fixups = new ScriptFixup[count];
+//
+//		for (int i = 0; i < fixups.length; ++i) {
+//			fixups[i] = new ScriptFixup();
+//			fixups[i].setType(reader.readNextByte());
+//		}
+//
+//		for (int i = 0; i < fixups.length; ++i) {
+//			fixups[i].setOffset(reader.readNextInt());
+//		}
+//
+//		return fixups;
+//	}
+//
+//	// TODO(adm244): read this inside Script object instead
+//	private ScriptImport[] readImports(MemoryBlock memoryBlock) throws IOException {
+//		ByteProvider provider = new InputStreamByteProvider(memoryBlock.getData(), memoryBlock.getSize());
+//		BinaryReader reader = new BinaryReader(provider, true);
+//
+//		int count = reader.readNextInt();
+//		ScriptImport[] imports = new ScriptImport[count];
+//
+//		for (int i = 0; i < imports.length; ++i) {
+//			long offset = reader.getPointerIndex();
+//			String name = reader.readNextAsciiString();
+//
+//			imports[i] = new ScriptImport(name, offset);
+//		}
+//
+//		return imports;
+//	}
 
 	// TODO(adm244): read this inside Script object instead
 	private ScriptExport[] readExports(Script script) throws IOException {

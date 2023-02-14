@@ -48,6 +48,7 @@ import ghidra.program.model.listing.Library;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
+import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.ExternalLocation;
 import ghidra.program.model.symbol.ExternalManager;
@@ -61,6 +62,7 @@ import reags.ScriptLoader;
 import reags.scom3.ScriptFixup;
 import reags.scom3.ScriptImport;
 import reags.state.ExternalFunction;
+import reags.state.FarCallAnalysisState;
 import reags.state.ScriptAnalysisState;
 
 /**
@@ -273,7 +275,12 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 	private boolean analyzeHasThis(Instruction entry, TaskMonitor monitor) {
 		try {
 			CodeBlock entryBlock = basicBlockModel.getFirstCodeBlockContaining(entry.getAddress(), monitor);
-			AddressSetView addressRange = new AddressSet(entryBlock.getMinAddress(), entry.getPrevious().getAddress());
+
+			Address start = entryBlock.getMinAddress();
+			Address entryPrev = entry.getPrevious().getAddress();
+			Address end = Address.max(start, entryPrev);
+
+			AddressSetView addressRange = new AddressSet(start, end);
 
 			InstructionIterator iter = listing.getInstructions(addressRange, false);
 			while (iter.hasNext()) {
@@ -302,6 +309,74 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		return false;
 	}
 
+	private int analyzeArgumentsCount(Instruction entry, TaskMonitor monitor) {
+		int count = 0;
+
+		try {
+			CodeBlock entryBlock = basicBlockModel.getFirstCodeBlockContaining(entry.getAddress(), monitor);
+
+			Address start = entryBlock.getMinAddress();
+			Address entryPrev = entry.getPrevious().getAddress();
+			Address end = Address.max(start, entryPrev);
+
+			AddressSetView addressRange = new AddressSet(start, end);
+
+			InstructionIterator iter = listing.getInstructions(addressRange, false);
+			while (iter.hasNext()) {
+				Instruction instr = iter.next();
+
+				switch (instr.getMnemonicString()) {
+				case "farcall":
+					return count;
+
+				case "farpush":
+					++count;
+					break;
+
+				case "setfuncargs":
+					return instr.getInt(4);
+
+				default:
+					break;
+				}
+			}
+
+			// TODO(adm244): analyze all source basic blocks...
+		} catch (CancelledException e) {
+			// do nothing...
+		} catch (MemoryAccessException e) {
+			e.printStackTrace();
+		}
+
+		return count;
+	}
+
+	private Address analyzeCallAddress(Instruction entry, TaskMonitor monitor) {
+		try {
+			CodeBlock entryBlock = basicBlockModel.getFirstCodeBlockContaining(entry.getAddress(), monitor);
+			AddressSetView addressRange = new AddressSet(entry.getNext().getAddress(), entryBlock.getMaxAddress());
+
+			InstructionIterator iter = listing.getInstructions(addressRange, true);
+			while (iter.hasNext()) {
+				Instruction instr = iter.next();
+
+				switch (instr.getMnemonicString()) {
+				case "farcall":
+					return instr.getAddress();
+
+				default:
+					break;
+				}
+			}
+
+			// TODO(adm244): analyze all destination basic blocks...
+		} catch (CancelledException e) {
+			// do nothing...
+		}
+
+		return Address.NO_ADDRESS;
+	}
+
 	private boolean applyFixups(Program program, TaskMonitor monitor) throws IOException, Exception {
 		Memory memory = program.getMemory();
 
@@ -319,8 +394,13 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		ScriptImport[] imports = readImports(importsBlock);
 
 		ScriptAnalysisState state = ScriptAnalysisState.getState(program);
+		FarCallAnalysisState pcodeInjectState = FarCallAnalysisState.getState(program);
+
+		// TODO(adm244): merge caches
 		HashMap<Long, ImportType> importTypeCache = new HashMap<Long, ImportType>();
 		HashMap<Long, Boolean> hasThisCache = new HashMap<Long, Boolean>();
+		HashMap<Long, Integer> argumentsCountCache = new HashMap<Long, Integer>();
+		HashMap<Long, Address> callAddrCache = new HashMap<Long, Address>();
 
 		// FIXME(adm244): instead of calculating many offsets here, calculate them in
 		// *.slaspec
@@ -389,17 +469,36 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 					}
 
 					boolean hasThis;
-
 					if (hasThisCache.containsKey(value)) {
 						hasThis = hasThisCache.get(value);
 					} else {
 						hasThis = analyzeHasThis(instr, monitor);
 					}
 
+					int argumentsCount;
+					if (argumentsCountCache.containsKey(value)) {
+						argumentsCount = argumentsCountCache.get(value);
+					} else {
+						argumentsCount = analyzeArgumentsCount(instr, monitor);
+					}
+
+					Address callAddr;
+					if (callAddrCache.containsKey(value)) {
+						callAddr = callAddrCache.get(value);
+					} else {
+						callAddr = analyzeCallAddress(instr, monitor);
+					}
+
+					ExternalFunction function = new ExternalFunction(externalAddress, importName, hasThis,
+							argumentsCount);
+
 					if (!state.functions.containsKey(value)) {
-						// TODO(adm244): analyze for "hasThis" value
-						// (backwards search "initobj" instruction)
-						state.functions.put(value, new ExternalFunction(externalAddress, importName, hasThis));
+						state.functions.put(value, function);
+					}
+
+					long callOffset = callAddr.getOffset();
+					if (!pcodeInjectState.functions.containsKey(callOffset)) {
+						pcodeInjectState.functions.put(callOffset, function);
 					}
 
 					instr.addOperandReference(opindex, externalAddress, RefType.INDIRECTION, SourceType.ANALYSIS);
@@ -470,6 +569,8 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 
 				externalFunction.setThunkedFunction(externalLocation.getFunction());
 				externalFunction.setCallingConvention(entry.hasThis() ? "farcallas" : "farcall");
+
+				entry.setFunction(externalFunction);
 			}
 		}
 

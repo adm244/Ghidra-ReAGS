@@ -177,6 +177,13 @@
 		</unaffected>
 	</prototype>
 
+	<callotherfixup targetop="memcpyCallOther">
+		<pcode dynamic="true">
+			<input name="value_immediate" />
+			<input name="size_immediate" />
+		</pcode>
+	</callotherfixup>
+
 	<callotherfixup targetop="movlitCallOther">
 		<pcode dynamic="true">
 			<input name="value_immediate" />
@@ -186,27 +193,13 @@
 
 	<callotherfixup targetop="farcallCallOther">
 		<pcode dynamic="true">
-			<!--<input name="arguments_count" />-->
 			<input name="address_register" />
 		</pcode>
 	</callotherfixup>
 
-	<!--<callotherfixup targetop="farpushCallOther">
+	<callotherfixup targetop="memzeroCallOther">
 		<pcode dynamic="true">
-			<input name="value_register" />
-		</pcode>
-	</callotherfixup>
-
-	<callotherfixup targetop="farsubspCallOther">
-		<pcode dynamic="true">
-			<input name="dummy_register" />
-			<input name="value_immediate" />
-		</pcode>
-	</callotherfixup>-->
-
-	<callotherfixup targetop="setfuncargsCallOther">
-		<pcode dynamic="true">
-			<input name="value_immediate" />
+			<input name="size_immediate" />
 		</pcode>
 	</callotherfixup>
 </compiler_spec>

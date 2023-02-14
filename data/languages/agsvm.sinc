@@ -1,28 +1,36 @@
 # sleigh specification file for AGSVM
 
+# FIXME(adm244): there are bugged behaviors with certain instructions
+# make sure to understand how they supposed to work and implement them as such.
+# For now definitely bugged are: land, lor, memwrite.ptr, memread.ptr
+
+@define SIZE "4"
+
 define endian=little;
 
 define alignment=4;
 
-define space ram type=ram_space size=4 default;
-define space register type=register_space size=4;
-define space farStack type=ram_space size=4;
-define space paramStack type=ram_space size=4;
+define space ram type=ram_space size=$(SIZE) default;
+define space register type=register_space size=$(SIZE);
+define space farStack type=ram_space size=$(SIZE);
+define space paramStack type=ram_space size=$(SIZE);
 
 # general purpose registers
-define register offset=0x00 size=4 [ ax bx cx dx ];
+define register offset=0x00 size=$(SIZE) [ ax bx cx dx ];
 # special meaning registers
-define register offset=0x14 size=4 [ sp op mar ];
+define register offset=0x14 size=$(SIZE) [ sp op mar ];
 # utility registers not present in virtual machine
-define register offset=0x20 size=4 [ pc counter _farsp ];
+define register offset=0x20 size=$(SIZE) [ pc counter _farsp ];
 
 # operations used for p-code injection
+define pcodeop memcpyCallOther;
 define pcodeop movlitCallOther;
 define pcodeop farcallCallOther;
-define pcodeop setfuncargsCallOther;
+define pcodeop memzeroCallOther;
 
 # operations used as black-box functions
-define pcodeop strcmp;
+define pcodeop streq;
+define pcodeop strneq;
 
 #TOKENS
 define token operation (32)
@@ -42,27 +50,27 @@ attach variables [ reg1 reg2 ] [ _ sp mar ax bx cx op dx ];
 
 # MARCO
 macro push(x) {
-    *:4 sp = x;
-    sp = sp + 4;
+    *:$(SIZE) sp = x;
+    sp = sp + $(SIZE);
 }
 
 macro pop(x) {
-    sp = sp - 4;
-    x = *:4 sp;
+    sp = sp - $(SIZE);
+    x = *:$(SIZE) sp;
 }
 
 macro farpush(x) {
-    *[farStack]:4 _farsp = x;
-    _farsp = _farsp + 4;
+    *[farStack]:$(SIZE) _farsp = x;
+    _farsp = _farsp + $(SIZE);
 }
 
 macro farsubsp(x) {
-    _farsp = _farsp - (x * 4);
+    _farsp = _farsp - (x * $(SIZE));
 }
 
 # Constructors
-dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
-    export *:4 rel;
+dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
+    export *:$(SIZE) rel;
 }
 
 # Instructions
@@ -83,18 +91,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # writelit
 :memcpy arg2, arg1     is opcode=0x04; arg1; arg2 {
-    if (arg1:4 == 1) goto <byte>;
-    if (arg1:4 == 2) goto <word>;
-
-    *:4 mar = arg2:4;
-    goto inst_next;
-
-    <byte>
-    *:1 mar = arg2:1;
-    goto inst_next;
-
-    <word>
-    *:2 mar = arg2:2;
+    memcpyCallOther(arg2:$(SIZE), arg1:$(SIZE));
 }
 
 # ret
@@ -105,17 +102,17 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # littoreg
 :mov reg1, arg2        is opcode=0x06; reg1; arg2 {
-    reg1 = movlitCallOther(arg2:4);
+    reg1 = movlitCallOther(arg2:$(SIZE));
 }
 
 # memread
 :memread4 reg1         is opcode=0x07; reg1 {
-    reg1 = *:4 mar;
+    reg1 = *:$(SIZE) mar;
 }
 
 # memwrite
 :memwrite4 reg1        is opcode=0x08; reg1 {
-    *:4 mar = reg1;
+    *:$(SIZE) mar = reg1;
 }
 
 # mulreg
@@ -125,7 +122,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # divreg
 :div reg1, reg2        is opcode=0x0a; reg1; reg2 {
-    reg1 = reg1 / reg2;
+    reg1 = reg1 s/ reg2;
 }
 
 # addreg
@@ -180,31 +177,33 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # and (logical)
 :land reg1, reg2       is opcode=0x15; reg1; reg2 {
-    if (reg1 == 0) goto <false>;
-    if (reg2 == 0) goto <false>;
-
-    reg1 = 1;
-    goto inst_next;
-
-    <false>
-    reg1 = 0;
+#    if (reg1 == 0) goto <false>;
+#    if (reg2 == 0) goto <false>;
+#
+#    reg1 = 1;
+#    goto inst_next;
+#
+#    <false>
+#    reg1 = 0;
+    reg1 = zext(reg1:1 && reg2:1);
 }
 
 # or (logical)
 :lor reg1, reg2        is opcode=0x16; reg1; reg2 {
-    if (reg1 != 0) goto <true>;
-    if (reg2 != 0) goto <true>;
-
-    reg1 = 0;
-    goto inst_next;
-
-    <true>
-    reg1 = 1;
+#    if (reg1 != 0) goto <true>;
+#    if (reg2 != 0) goto <true>;
+#
+#    reg1 = 0;
+#    goto inst_next;
+#
+#    <true>
+#    reg1 = 1;
+    reg1 = zext(reg1:1 || reg2:1);
 }
 
 # call
 :call reg1             is opcode=0x17; reg1 {
-    push(&:4 inst_next);
+    push(&:$(SIZE) inst_next);
     call [reg1];
 }
 
@@ -270,7 +269,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # linenum
 :sourceline arg1       is opcode=0x24; arg1 {
-    # NOP
+#    NOP
 }
 
 # callas
@@ -285,7 +284,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # numfuncargs
 :setfuncargs arg1      is opcode=0x27; arg1 {
-    setfuncargsCallOther(arg1:4);
+#    NOP
 }
 
 # modreg
@@ -300,13 +299,14 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # notreg
 :lnot reg1             is opcode=0x2a; reg1 {
-    if (reg1 == 0) goto <false>;
-
-    reg1 = 0;
-    goto inst_next;
-
-    <false>
-    reg1 = 1;
+#    if (reg1 == 0) goto <false>;
+#
+#    reg1 = 0;
+#    goto inst_next;
+#
+#    <false>
+#    reg1 = 1;
+    reg1 = zext(!reg1:1);
 }
 
 # shiftleft
@@ -321,37 +321,35 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # callobj
 :initobj reg1          is opcode=0x2d; reg1 {
-#    TODO(adm244): implement it so we can figure out that next farcall is farcallas
     op = reg1;
 }
 
 # checkbounds
 :assertlte reg1, arg2  is opcode=0x2e; reg1; arg2 {
-#    assert(reg1:4, 0:4, arg2:4);
     # NOP
 }
 
 # memwriteptr
 :memwrite.ptr reg1     is opcode=0x2f; reg1 {
 #    FIXME(adm244): incorrect behavior
-    *:4 mar = reg1;
+    *:$(SIZE) mar = reg1;
 }
 
 # memreadptr
 :memread.ptr reg1      is opcode=0x30; reg1 {
 #    FIXME(adm244): incorrect behavior
-    reg1 = *:4 mar;
+    reg1 = *:$(SIZE) mar;
 }
 
 # memzeroptr
 :memzero.ptr           is opcode=0x31 {
 #    FIXME(adm244): incorrect behavior
-    *:4 mar = 0;
+    *:$(SIZE) mar = 0;
 }
 
 # meminit
 :meminit reg1          is opcode=0x32; reg1 {
-    *:4 mar = reg1;
+    *:$(SIZE) mar = reg1;
 }
 
 # loadspoffs
@@ -416,49 +414,49 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # zeromemory
 :memzero arg1          is opcode=0x3f; arg1 {
-    counter = 0;
-
-    <start>
-    if (counter == arg1) goto inst_next;
-
-    *:4 mar + counter = 0;
-    counter = counter + 1;
-
-    goto <start>;
+    memzeroCallOther(arg1:$(SIZE));
+#    counter = 0;
+#
+#    <start>
+#    if (counter == arg1) goto inst_next;
+#
+#    *:4 mar + counter = 0;
+#    counter = counter + 1;
+#
+#    goto <start>;
 }
 
 # createstring
 :strnew reg1           is opcode=0x40; reg1 {
-#    TODO(adm244): reg1 is offset into .strings
-#    reg1 = newobject(reg1);
-#    reg1 = *[strings]:4 reg1;
-    reg1 = reg1;
+#    NOP
 }
 
 # stringsequal
 :streq reg1, reg2      is opcode=0x41; reg1; reg2 {
-    local tmp:4 = strcmp(reg1, reg2);
-
-    if (tmp == 0) goto <true>;
-
-    reg1 = 0;
-    goto inst_next;
-
-    <true>
-    reg1 = 1;
+    reg1 = streq(reg1, reg2);
+#    local tmp:4 = strcmp(reg1, reg2);
+#
+#    if (tmp == 0) goto <true>;
+#
+#    reg1 = 0;
+#    goto inst_next;
+#
+#    <true>
+#    reg1 = 1;
 }
 
 # stringsnoteq
 :strneq reg1, reg2     is opcode=0x42; reg1; reg2 {
-    local tmp:4 = strcmp(reg1, reg2);
-
-    if (tmp != 0) goto <true>;
-
-    reg1 = 0;
-    goto inst_next;
-
-    <true>
-    reg1 = 1;
+    reg1 = strneq(reg1, reg2);
+#    local tmp:4 = strcmp(reg1, reg2);
+#
+#    if (tmp != 0) goto <true>;
+#
+#    reg1 = 0;
+#    goto inst_next;
+#
+#    <true>
+#    reg1 = 1;
 }
 
 # checknullreg
@@ -473,7 +471,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # memzeroptrnd
 :memzerond             is opcode=0x45 {
-    *:4 mar = 0;
+    *:$(SIZE) mar = 0;
 }
 
 # jnz
@@ -488,10 +486,10 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * 4); ] {
 
 # newarray
 :arrnew reg1, arg2, arg3  is opcode=0x48; reg1; arg2; arg3 {
-    reg1 = newobject(reg1, arg2:4, arg3:4);
+    reg1 = newobject(reg1, arg2:$(SIZE), arg3:$(SIZE));
 }
 
 # newuserobject
 :objnew reg1, arg2     is opcode=0x49; reg1; arg2 {
-    reg1 = newobject(reg1, arg2:4);
+    reg1 = newobject(reg1, arg2:$(SIZE));
 }

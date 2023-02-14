@@ -27,9 +27,10 @@ import ghidra.program.model.listing.Program;
 
 public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 
+	public static final String MEMCPY = "memcpyCallOther";
 	public static final String MOVLIT = "movlitCallOther";
 	public static final String FARCALL = "farcallCallOther";
-	public static final String SETFUNCARGS = "setfuncargsCallOther";
+	public static final String MEMZERO = "memzeroCallOther";
 
 	public Map<String, InjectPayload> implementedOps;
 
@@ -37,9 +38,10 @@ public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 		super(language);
 
 		implementedOps = new HashMap<String, InjectPayload>();
-		implementedOps.put(MOVLIT, new InjectMovLit(language, 0x1000));
-		implementedOps.put(FARCALL, new InjectFarCall(language, 0x2000));
-		implementedOps.put(SETFUNCARGS, new InjectSetFuncArgs(language, 0x3000));
+		implementedOps.put(MEMCPY, new InjectMemCpy(language, 0x1000));
+		implementedOps.put(MOVLIT, new InjectMovLit(language, 0x2000));
+		implementedOps.put(FARCALL, new InjectFarCall(language, 0x3000));
+		implementedOps.put(MEMZERO, new InjectMemZero(language, 0x4000));
 	}
 
 	public PcodeInjectLibraryScom3(PcodeInjectLibraryScom3 op2) {

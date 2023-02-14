@@ -1,13 +1,13 @@
 package reags.pcodeInject;
 
 import ghidra.app.plugin.processors.sleigh.SleighLanguage;
-import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.InjectContext;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
-import reags.state.FunctionState;
+import reags.state.ExternalFunction;
+import reags.state.FarCallAnalysisState;
 
 public class InjectFarCall extends InjectPayloadFarStack {
 
@@ -25,14 +25,15 @@ public class InjectFarCall extends InjectPayloadFarStack {
 	public PcodeOp[] getPcode(Program program, InjectContext context) {
 		MyPcodeOpEmitter pCode = new MyPcodeOpEmitter(language, context.baseAddr, uniqueBase);
 
-		Address address = getFunctionAddress(program, context);
-		FunctionState state = getFunctionState(program, address);
+		FarCallAnalysisState state = FarCallAnalysisState.getState(program);
+		ExternalFunction function = state.functions.get(context.baseAddr.getOffset());
 
-		int argumentsCount = state.getArgumentsCount();
-		if (argumentsCount < 0) {
-			// TODO(adm244): handle the case when argumentsCount is not set
-			// (this might be a big problem actually...)
+		if (function == null) {
+			// missing function at context base call address
+			return null;
 		}
+
+		int argumentsCount = function.getArgumentsCount();
 
 		int totalSize = 1000;
 		for (int i = 0; i < argumentsCount; ++i) {
