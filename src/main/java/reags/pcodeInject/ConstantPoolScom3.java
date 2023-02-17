@@ -1,7 +1,13 @@
 package reags.pcodeInject;
 
 import ghidra.program.model.address.Address;
+import ghidra.program.model.data.CharDataType;
+import ghidra.program.model.data.DataType;
+import ghidra.program.model.data.DataTypeManager;
+import ghidra.program.model.data.IntegerDataType;
 import ghidra.program.model.data.PointerDataType;
+import ghidra.program.model.data.ShortDataType;
+import ghidra.program.model.data.Undefined2DataType;
 import ghidra.program.model.lang.ConstantPool;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
@@ -19,9 +25,10 @@ public class ConstantPoolScom3 extends ConstantPool {
 	public static final String CPOOL_STRING = "3";
 	public static final String CPOOL_IMPORT_DATA = "4";
 	public static final String CPOOL_IMPORT_FUNCTION = "5";
+	public static final String CPOOL_NEW_ARRAY = "6";
 
 //	private Program program;
-//	private DataTypeManager dtManager;
+	private DataTypeManager dtManager;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
 	private ScriptAnalysisState scriptState;
@@ -32,7 +39,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 //		this.program = program;
 
 		Memory memory = program.getMemory();
-//		dtManager = program.getDataTypeManager();
+		dtManager = program.getDataTypeManager();
 
 		dataBlock = memory.getBlock("data");
 		codeBlock = memory.getBlock("code");
@@ -44,6 +51,21 @@ public class ConstantPoolScom3 extends ConstantPool {
 //	private String getType(String name) {
 //		return null;
 //	}
+
+	private DataType getPrimitiveArrayType(int size) {
+		switch (size) {
+		case 1:
+			return CharDataType.dataType;
+		case 2:
+			return ShortDataType.dataType;
+		case 4:
+			// TODO(adm244): could be bool and float as well...
+			return IntegerDataType.dataType;
+
+		default:
+			throw new IllegalArgumentException("Invalid primitive size: " + size);
+		}
+	}
 
 	// ref array does not include the first element passed to the cpool operator.
 	// ref[0] is the constant pool index
@@ -114,6 +136,26 @@ public class ConstantPoolScom3 extends ConstantPool {
 //			}
 //
 //			record.type = new PointerDataType(dt);
+			break;
+		}
+
+		case CPOOL_NEW_ARRAY: {
+			int type = (int) ref[2];
+
+			// FIXME(adm244): doesn't work as it should...
+			DataType dataType = getPrimitiveArrayType((int) index);
+
+			DataType dt = dtManager.getPointer(dataType);
+
+			record.tag = ConstantPool.POINTER_METHOD;
+//			record.tag = ConstantPool.CLASS_REFERENCE;
+//			record.token = dataType.getDisplayName();
+//			record.type = dtManager.getPointer(dataType);
+			record.token = "mytype";
+			record.type = Undefined2DataType.dataType;
+//			record.type = new ArrayDataType(dataType, 0, dataType.getLength());
+//			record.type = PointerDataType.dataType;
+
 			break;
 		}
 

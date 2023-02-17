@@ -6,6 +6,13 @@
 
 @define SIZE "4"
 
+@define CPOOL_DATA "1"
+@define CPOOL_FUNCTION "2"
+@define CPOOL_STRING "3"
+@define CPOOL_IMPORT_DATA "4"
+@define CPOOL_IMPORT_FUNCTION "5"
+@define CPOOL_NEW_ARRAY "6"
+
 define endian=little;
 
 define alignment=4;
@@ -28,10 +35,11 @@ define pcodeop movlitCallOther;
 define pcodeop farcallCallOther;
 define pcodeop memzeroCallOther;
 
+#define pcodeop arrnewCallOther;
 # operations used as black-box functions
-define pcodeop streq;
-define pcodeop strneq;
-
+#define pcodeop strcmp;
+#define pcodeop streq;
+#define pcodeop strneq;
 #TOKENS
 define token operation (32)
     opcode   = ( 0,23)
@@ -107,12 +115,12 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # memread
 :memread4 reg1         is opcode=0x07; reg1 {
-    reg1 = *:$(SIZE) mar;
+    reg1 = *:4 mar;
 }
 
 # memwrite
 :memwrite4 reg1        is opcode=0x08; reg1 {
-    *:$(SIZE) mar = reg1;
+    *:4 mar = reg1:4;
 }
 
 # mulreg
@@ -219,12 +227,12 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # memwriteb
 :memwrite1 reg1        is opcode=0x1a; reg1 {
-    *:1 mar = reg1;
+    *:1 mar = reg1:1;
 }
 
 # memwritew
 :memwrite2 reg1        is opcode=0x1b; reg1 {
-    *:2 mar = reg1;
+    *:2 mar = reg1:2;
 }
 
 # jz
@@ -274,7 +282,11 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # callas
 :callscr arg1          is opcode=0x25; arg1 {
-#    TODO(adm244): research this
+#    NOTE(adm244): this instruction is not emitted by the compiler,
+#    it's used as a replacement of "farcall" instruction at runtime.
+#    BTW, its implementation assumes that "farcall" follows directly
+#    after "movlit" instruction, so if you emit some code in-between
+#    AGS runtime fails to replace the instruction.
 }
 
 # thisbase
@@ -348,7 +360,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 }
 
 # meminit
-:meminit reg1          is opcode=0x32; reg1 {
+:meminit.ptr reg1      is opcode=0x32; reg1 {
     *:$(SIZE) mar = reg1;
 }
 
@@ -415,15 +427,6 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 # zeromemory
 :memzero arg1          is opcode=0x3f; arg1 {
     memzeroCallOther(arg1:$(SIZE));
-#    counter = 0;
-#
-#    <start>
-#    if (counter == arg1) goto inst_next;
-#
-#    *:4 mar + counter = 0;
-#    counter = counter + 1;
-#
-#    goto <start>;
 }
 
 # createstring
@@ -433,30 +436,27 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # stringsequal
 :streq reg1, reg2      is opcode=0x41; reg1; reg2 {
-    reg1 = streq(reg1, reg2);
-#    local tmp:4 = strcmp(reg1, reg2);
-#
-#    if (tmp == 0) goto <true>;
-#
-#    reg1 = 0;
-#    goto inst_next;
-#
-#    <true>
-#    reg1 = 1;
+#    NOTE(adm244): this produces INT_EQUAL pcode which yields correct decompilation
+#    _BUT_ will give incorrect results when attempting emulation (BEWARE)
+    if (reg1 == reg2) goto <true>;
+
+    reg1 = 0;
+    goto inst_next;
+
+    <true>
+    reg1 = 1;
 }
 
 # stringsnoteq
 :strneq reg1, reg2     is opcode=0x42; reg1; reg2 {
-    reg1 = strneq(reg1, reg2);
-#    local tmp:4 = strcmp(reg1, reg2);
-#
-#    if (tmp != 0) goto <true>;
-#
-#    reg1 = 0;
-#    goto inst_next;
-#
-#    <true>
-#    reg1 = 1;
+#    NOTE(adm244): see "streq" instruction note
+    if (reg1 != reg2) goto <true>;
+
+    reg1 = 0;
+    goto inst_next;
+
+    <true>
+    reg1 = 1;
 }
 
 # checknullreg
@@ -470,7 +470,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 }
 
 # memzeroptrnd
-:memzerond             is opcode=0x45 {
+:memzerond.ptr         is opcode=0x45 {
     *:$(SIZE) mar = 0;
 }
 
@@ -486,7 +486,11 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # newarray
 :arrnew reg1, arg2, arg3  is opcode=0x48; reg1; arg2; arg3 {
-    reg1 = newobject(reg1, arg2:$(SIZE), arg3:$(SIZE));
+#    reg1 = arrnewCallOther(reg1, arg2:$(SIZE), arg3:$(SIZE));
+#    reg1 = count; arg2 = size; arg3 = isManaged
+    local tmp = cpool(reg1, arg2, $(CPOOL_NEW_ARRAY), arg3);
+    reg1 = newobject(tmp, reg1);
+#    reg1 = newobject(reg1, arg2:$(SIZE), arg3:$(SIZE));
 }
 
 # newuserobject

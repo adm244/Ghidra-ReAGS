@@ -109,6 +109,18 @@ public class MyPcodeOpEmitter {
 	private Varnode getConstant(long val, int size) {
 		return new Varnode(constSpace.getAddress(val), size);
 	}
+	
+	private Varnode getConstant(String constant, int size) {
+		long value = Long.decode(constant);
+		return getConstant(value, size);
+	}
+	
+	private Varnode getConstant(String constant) {
+		String[] piece = constant.split(":");
+		int size = Integer.parseInt(piece[1]);
+		long value = Long.decode(piece[0]);
+		return getConstant(value, size);
+	}
 
 	private int findOpCode(String name) {
 		if (name.equals("cpool")) {
@@ -323,10 +335,24 @@ public class MyPcodeOpEmitter {
 		Varnode[] in = new Varnode[3];
 		in[0] = getConstant(0, 4);
 		in[1] = index;
-		in[2] = constantOrRegister(cmd);
+		in[2] = getConstant(cmd, 4);
 		PcodeOp op = new PcodeOp(opAddress, seqnum++, PcodeOp.CPOOLREF, in, output);
 		opList.add(op);
 	}
+	
+//	public void emitAssignCPoolRef(String output, String cmd, String... args) {
+//		Varnode[] in = new Varnode[args.length + 2];
+//		in[0] = getConstant(0, 4);
+//		in[1] = getConstant(cmd);
+//		
+//		for (int i = 0; i < args.length; ++i) {
+//			in[i + 2] = constantOrRegister(args[i]);
+//		}
+//	}
+//	
+//	public void emitNew(Varnode output, String ptr, Varnode count) {
+//		
+//	}
 
 	/**
 	 * Appends the pcode to assign a register to the result of a pcode op call with

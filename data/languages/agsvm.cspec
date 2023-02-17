@@ -3,7 +3,14 @@
 <!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/compiler_spec.rxg -->
 
 <!-- NOTES:
-    - (TODO) It seems that calling conventions work as intended at this point
+    - (TODO) There's a "problem" with "boolean and" and "boolean or" instructions.
+        For multiple and's and or's AGS compiler outputs a series of "if" statements
+        which looks awful in the decompiled output. It can be detected by a series of
+        "jz" instructions pointing to another "jz" instruction until it reaches the
+        last basic block for this series. Maybe we can "help" the decompiler to
+        optimize this mess?
+
+    - (SOLVED???) It seems that calling conventions work as intended at this point
         the only exception is "nearcall" and "nearcallas", these two tend
         to mess up a stack from time to time, I guess that's expected
         since "extrapop" is "unknown" but it doesn't work even when there's
@@ -49,42 +56,29 @@
 		<range space="ram" />
 	</global>
 
+	<!-- FIXME(adm244): the "farStack" problem is STILL EXISTS!!! -->
+
+	<!-- INVESTIGATE(adm244): "This routine is used by the initialization process to add
+	address ranges to which there is never an (indirect) pointer" -->
+	<!--<element name="nohighptr">
+		<oneOrMore>
+			<ref name="memory_tags_type" />
+		</oneOrMore>
+	</element>-->
+
+	<!-- TODO(adm244): investigate if we can use this to create a "stack" for "farcall" -->
+	<!-- "This process sets up a 'register relative' space for this architecture." -->
+	<!-- NOTE(adm244): this "might" solve "farStack" problem... -->
+	<!--<spacebase name="farstack" register="_farsp" space="farStack" />-->
+
 	<stackpointer register="sp" space="ram" growth="positive" />
 
-	<default_proto>
-		<!-- <prototype name="__agscall" type="stdcall" extrapop="unknown" stackshift="-4">
-            <input>
-                <pentry minsize="1" maxsize="500" align="4">
-                    <addr space="stack" offset="0xFFFFFE08"/>
-                </pentry>
-            </input>
-            <output killedbycall="true">
-                <pentry minsize="1" maxsize="4">
-                    <register name="ax"/>
-                </pentry>
-            </output>
-            <returnaddress>
-                <varnode space="stack" offset="-4" size="4"/>
-            </returnaddress>
-            <unaffected>
-                <register name="sp"/>
-            </unaffected>
-            <killedbycall>
-                <register name="op"/>
-            </killedbycall>
-            <likelytrash>
-                <register name="bx"/>
-                <register name="cx"/>
-                <register name="dx"/>
-            </likelytrash>
-            <localrange>
-                <range space="stack"/>
-            </localrange>
-        </prototype> -->
+	<deadcodedelay space="stack" delay="2" />
 
-		<prototype name="nearcall" extrapop="unknown" stackshift="-4">
+	<default_proto>
+		<prototype name="nearcall" extrapop="-4" stackshift="-4">
 			<input>
-				<!-- TODO: increase stack size to 250*4; offset=twos(maxsize+4) -->
+				<!-- NOTE: offset=twos(maxsize+4) -->
 				<pentry minsize="1" maxsize="1000" align="4">
 					<addr space="stack" offset="0xFFFFFC14" />
 				</pentry>
@@ -94,9 +88,12 @@
 					<register name="ax" />
 				</pentry>
 			</output>
-
-			<pcode inject="uponentry" dynamic="true" />
-
+			<likelytrash>
+				<register name="ax" />
+				<register name="bx" />
+				<register name="cx" />
+				<register name="dx" />
+			</likelytrash>
 			<unaffected>
 				<register name="sp" />
 				<register name="op" />
@@ -108,11 +105,17 @@
 				(search "int4 ActionRestrictLocal::apply(Funcdata &data)" in "coreaction.cc" for more info) -->
 				<register name="_farsp" />
 			</unaffected>
+			<!-- FIXME(adm244): turned off for now since it causes "farStack" issues -->
+			<!--<localrange>
+				<range space="stack" />
+			</localrange>-->
+			<pcode inject="uponentry" dynamic="true" />
 		</prototype>
 	</default_proto>
 
+	<!-- TODO(adm244): rename to "__thiscall" since it's forced to have one anyways -->
 	<prototype name="nearcallas" extrapop="unknown" stackshift="-4" hasthis="true">
-		<input thisbeforeretpointer="true">
+		<input>
 			<pentry minsize="1" maxsize="4">
 				<register name="op" />
 			</pentry>
@@ -125,19 +128,21 @@
 				<register name="ax" />
 			</pentry>
 		</output>
-
-		<pcode inject="uponentry" dynamic="true" />
-
+		<likelytrash>
+			<register name="ax" />
+			<register name="bx" />
+			<register name="cx" />
+			<register name="dx" />
+		</likelytrash>
 		<unaffected>
 			<register name="sp" />
 			<register name="_farsp" />
 		</unaffected>
+		<!--<localrange>
+			<range space="stack" />
+		</localrange>-->
+		<pcode inject="uponentry" dynamic="true" />
 	</prototype>
-
-	<!-- NOTE(adm244): these are used to generate pcode for functions "prologue" and "epilogue"(?)
-        which is CALLMECHANISM_TYPE in InjectPayload interface -->
-	<!-- <pcode inject="uponentry" dynamic="true"/> -->
-	<!-- <pcode inject="uponreturn" dynamic="true"/> -->
 
 	<prototype name="farcall" extrapop="0" stackshift="0">
 		<input>
@@ -158,7 +163,7 @@
 	</prototype>
 
 	<prototype name="farcallas" extrapop="0" stackshift="0" hasthis="true">
-		<input thisbeforeretpointer="true">
+		<input>
 			<pentry minsize="1" maxsize="4">
 				<register name="op" />
 			</pentry>
@@ -202,4 +207,11 @@
 			<input name="size_immediate" />
 		</pcode>
 	</callotherfixup>
+
+	<!--<callotherfixup targetop="arrnewCallOther">
+		<pcode dynamic="true">
+			<input name="size_immediate" />
+			<input name="type_immediate" />
+		</pcode>
+	</callotherfixup>-->
 </compiler_spec>

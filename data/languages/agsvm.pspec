@@ -13,6 +13,21 @@
 		<range space="ram" first="0" last="0" />
 	</inferptrbounds>-->
 
+	<!-- INVESTIGATE(adm244): this marks a certain address space as "data space". What would that do exactly? -->
+	<!--<element name="data_space">
+		<attribute name="space" />
+		<optional>
+			<attribute name="ptr_wordsize" />
+		</optional>
+	</element>-->
+
+	<!-- INVESTIGATE(adm244): maybe this will solve "farStack" problem? -->
+	<!--<element name="incidentalcopy">
+		<oneOrMore>
+			<ref name="varnode_tags_type" />
+		</oneOrMore>
+	</element>-->
+
 	<register_data>
 		<register name="counter" hidden="true" />
 		<register name="_farsp" hidden="true" />
