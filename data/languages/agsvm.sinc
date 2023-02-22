@@ -19,7 +19,8 @@ define alignment=4;
 
 define space ram type=ram_space size=$(SIZE) default;
 define space register type=register_space size=$(SIZE);
-define space farStack type=ram_space size=$(SIZE);
+#define space farStack type=ram_space size=$(SIZE);
+define space farSpace type=ram_space size=$(SIZE);
 define space paramStack type=ram_space size=$(SIZE);
 
 # general purpose registers
@@ -68,7 +69,7 @@ macro pop(x) {
 }
 
 macro farpush(x) {
-    *[farStack]:$(SIZE) _farsp = x;
+    *[farSpace]:$(SIZE) _farsp = x;
     _farsp = _farsp + $(SIZE);
 }
 
@@ -486,11 +487,11 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # newarray
 :arrnew reg1, arg2, arg3  is opcode=0x48; reg1; arg2; arg3 {
-#    reg1 = arrnewCallOther(reg1, arg2:$(SIZE), arg3:$(SIZE));
 #    reg1 = count; arg2 = size; arg3 = isManaged
+#    FIXME(adm244): cannot make it to display correct data type name;
+#    decompiler takes data type from newobject destination varnode (reg1 in this case)
     local tmp = cpool(reg1, arg2, $(CPOOL_NEW_ARRAY), arg3);
     reg1 = newobject(tmp, reg1);
-#    reg1 = newobject(reg1, arg2:$(SIZE), arg3:$(SIZE));
 }
 
 # newuserobject

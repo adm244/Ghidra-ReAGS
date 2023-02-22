@@ -146,13 +146,13 @@ public class ConstantPoolScom3 extends ConstantPool {
 			DataType dataType = getPrimitiveArrayType((int) index);
 
 			DataType dt = dtManager.getPointer(dataType);
-
-			record.tag = ConstantPool.POINTER_METHOD;
+			
+			record.tag = ConstantPool.POINTER_FIELD;
 //			record.tag = ConstantPool.CLASS_REFERENCE;
-//			record.token = dataType.getDisplayName();
-//			record.type = dtManager.getPointer(dataType);
-			record.token = "mytype";
-			record.type = Undefined2DataType.dataType;
+			record.token = dataType.getDisplayName();
+			record.type = dt;
+//			record.token = "mytype";
+//			record.type = Undefined2DataType.dataType;
 //			record.type = new ArrayDataType(dataType, 0, dataType.getLength());
 //			record.type = PointerDataType.dataType;
 

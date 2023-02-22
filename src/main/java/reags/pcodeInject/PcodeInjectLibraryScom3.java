@@ -62,7 +62,7 @@ public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 	@Override
 	public InjectPayload allocateInject(String sourceName, String name, int type) {
 		if (type == InjectPayload.CALLMECHANISM_TYPE) {
-			return new InjectPayloadUponEntry(name, sourceName, language, getNextUniqueBase());
+//			return new InjectPayloadUponEntry(name, sourceName, language, getNextUniqueBase());
 		} else if (type == InjectPayload.CALLOTHERFIXUP_TYPE) {
 			InjectPayload payload = implementedOps.get(name);
 			if (payload != null) {

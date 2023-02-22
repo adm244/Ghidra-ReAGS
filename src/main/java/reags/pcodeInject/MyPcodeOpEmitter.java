@@ -135,7 +135,8 @@ public class MyPcodeOpEmitter {
 		this.language = language;
 		constSpace = language.getAddressFactory().getConstantSpace();
 		defSpace = language.getDefaultSpace();
-		farStackSpace = language.getAddressFactory().getAddressSpace("farStack");
+//		farStackSpace = language.getAddressFactory().getAddressSpace("farStack");
+		farStackSpace = language.getAddressFactory().getAddressSpace("farSpace");
 		uniqueSpace = language.getAddressFactory().getUniqueSpace();
 		uniqueBase = uniqBase;
 		opAddress = opAddr;

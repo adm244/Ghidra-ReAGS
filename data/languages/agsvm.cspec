@@ -56,6 +56,9 @@
 		<range space="ram" />
 	</global>
 
+	<stackpointer register="sp" space="ram" growth="positive" />
+	<deadcodedelay space="stack" delay="2" />
+
 	<!-- FIXME(adm244): the "farStack" problem is STILL EXISTS!!! -->
 
 	<!-- INVESTIGATE(adm244): "This routine is used by the initialization process to add
@@ -65,15 +68,15 @@
 			<ref name="memory_tags_type" />
 		</oneOrMore>
 	</element>-->
+	<!--<nohighptr>
+		<register name="_farsp" />
+		<range space="farSpace" first="0" last="0xFFFFFFFF" />
+	</nohighptr>-->
 
 	<!-- TODO(adm244): investigate if we can use this to create a "stack" for "farcall" -->
 	<!-- "This process sets up a 'register relative' space for this architecture." -->
 	<!-- NOTE(adm244): this "might" solve "farStack" problem... -->
-	<!--<spacebase name="farstack" register="_farsp" space="farStack" />-->
-
-	<stackpointer register="sp" space="ram" growth="positive" />
-
-	<deadcodedelay space="stack" delay="2" />
+	<spacebase name="farStack" register="_farsp" space="farSpace" />
 
 	<default_proto>
 		<prototype name="nearcall" extrapop="-4" stackshift="-4">
@@ -109,7 +112,7 @@
 			<!--<localrange>
 				<range space="stack" />
 			</localrange>-->
-			<pcode inject="uponentry" dynamic="true" />
+			<!--<pcode inject="uponentry" dynamic="true" />-->
 		</prototype>
 	</default_proto>
 
@@ -141,7 +144,7 @@
 		<!--<localrange>
 			<range space="stack" />
 		</localrange>-->
-		<pcode inject="uponentry" dynamic="true" />
+		<!--<pcode inject="uponentry" dynamic="true" />-->
 	</prototype>
 
 	<prototype name="farcall" extrapop="0" stackshift="0">
