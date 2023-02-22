@@ -38,6 +38,8 @@ import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.block.BasicBlockModel;
 import ghidra.program.model.block.CodeBlock;
 import ghidra.program.model.data.DataType;
+import ghidra.program.model.data.Undefined;
+import ghidra.program.model.data.Undefined1DataType;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.Processor;
 import ghidra.program.model.listing.Data;
@@ -521,6 +523,7 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 			else if (type == ScriptFixup.DATA && dataBlock != null) {
 				Address dataOffset = dataBlock.getStart().add(value);
 				api.createData(dataOffset, DataType.DEFAULT);
+//				api.createData(dataOffset, Undefined1DataType.dataType);
 
 				fixupType = FixupType.DATA;
 

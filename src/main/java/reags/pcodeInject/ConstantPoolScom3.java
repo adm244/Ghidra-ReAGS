@@ -1,13 +1,17 @@
 package reags.pcodeInject;
 
 import ghidra.program.model.address.Address;
+import ghidra.program.model.data.CategoryPath;
 import ghidra.program.model.data.CharDataType;
 import ghidra.program.model.data.DataType;
+import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataTypeManager;
+import ghidra.program.model.data.DataTypePath;
 import ghidra.program.model.data.IntegerDataType;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.ShortDataType;
-import ghidra.program.model.data.Undefined2DataType;
+import ghidra.program.model.data.StructureDataType;
+import ghidra.program.model.data.TypedefDataType;
 import ghidra.program.model.lang.ConstantPool;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
@@ -27,7 +31,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 	public static final String CPOOL_IMPORT_FUNCTION = "5";
 	public static final String CPOOL_NEW_ARRAY = "6";
 
-//	private Program program;
+	private Program program;
 	private DataTypeManager dtManager;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
@@ -36,7 +40,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 //	private AddressSpace externalSpace;
 
 	public ConstantPoolScom3(Program program) {
-//		this.program = program;
+		this.program = program;
 
 		Memory memory = program.getMemory();
 		dtManager = program.getDataTypeManager();
@@ -106,9 +110,26 @@ public class ConstantPoolScom3 extends ConstantPool {
 			// TODO(adm244): get DataType or create it then assign pointer to it
 			// this way we don't need to hold the data in memory and can change its size
 
+//			AddressSpace varSpace = new GenericAddressSpace(name, 32, AddressSpace.TYPE_VARIABLE,
+//					program.getAddressFactory().getNumAddressSpaces() + 1);
+//			Address varAddress = varSpace.getAddress(0);
+
+			// FIXME(adm244): move this into analyzer/loader
+			DataType dt = dtManager.getDataType(new DataTypePath("/external/data", name));
+//			if (dt == null) {
+////				dt = new TypedefDataType(name, DataType.DEFAULT);
+//				dt = new StructureDataType(new CategoryPath("/external/data"), name, 0);
+//
+//				int id = dtManager.startTransaction("CREATION:" + name);
+//				dtManager.addDataType(dt, DataTypeConflictHandler.DEFAULT_HANDLER);
+//				dtManager.endTransaction(id, true);
+//			}
+
 			record.tag = ConstantPool.POINTER_FIELD;
-			record.token = "DATA:" + name;
-			record.type = PointerDataType.dataType;
+//			record.token = "DATA:" + name;
+			record.token = name;
+//			record.type = PointerDataType.dataType;
+			record.type = dtManager.getPointer(dt);
 			break;
 		}
 
@@ -146,7 +167,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 			DataType dataType = getPrimitiveArrayType((int) index);
 
 			DataType dt = dtManager.getPointer(dataType);
-			
+
 			record.tag = ConstantPool.POINTER_FIELD;
 //			record.tag = ConstantPool.CLASS_REFERENCE;
 			record.token = dataType.getDisplayName();
