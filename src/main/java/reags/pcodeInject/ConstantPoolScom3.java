@@ -4,14 +4,11 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.data.CategoryPath;
 import ghidra.program.model.data.CharDataType;
 import ghidra.program.model.data.DataType;
-import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataTypeManager;
-import ghidra.program.model.data.DataTypePath;
+import ghidra.program.model.data.FunctionDefinitionDataType;
 import ghidra.program.model.data.IntegerDataType;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.ShortDataType;
-import ghidra.program.model.data.StructureDataType;
-import ghidra.program.model.data.TypedefDataType;
 import ghidra.program.model.lang.ConstantPool;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
@@ -24,6 +21,8 @@ public class ConstantPoolScom3 extends ConstantPool {
 //	private static final int POINTER_SIZE = 4;
 	private static final int INSTRUCTION_SIZE = 4;
 
+	public static final CategoryPath CPOOL_DATA_PATH = new CategoryPath("/external/data");
+
 	public static final String CPOOL_DATA = "1";
 	public static final String CPOOL_FUNCTION = "2";
 	public static final String CPOOL_STRING = "3";
@@ -31,7 +30,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 	public static final String CPOOL_IMPORT_FUNCTION = "5";
 	public static final String CPOOL_NEW_ARRAY = "6";
 
-	private Program program;
+//	private Program program;
 	private DataTypeManager dtManager;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
@@ -40,7 +39,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 //	private AddressSpace externalSpace;
 
 	public ConstantPoolScom3(Program program) {
-		this.program = program;
+//		this.program = program;
 
 		Memory memory = program.getMemory();
 		dtManager = program.getDataTypeManager();
@@ -51,10 +50,6 @@ public class ConstantPoolScom3 extends ConstantPool {
 
 //		externalSpace = AddressSpace.EXTERNAL_SPACE;
 	}
-
-//	private String getType(String name) {
-//		return null;
-//	}
 
 	private DataType getPrimitiveArrayType(int size) {
 		switch (size) {
@@ -99,37 +94,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 			break;
 
 		case CPOOL_IMPORT_DATA: {
-//			address = externalBlock.getStart().add(index * POINTER_SIZE);
-			String name = scriptState.imports.get(index);
-//			address = externalSpace.getAddress(index * POINTER_SIZE);
-//			fillPrimitive(record, address, name);
-
-			// TODO(adm244): get type name from 'name' if any, otherwise it's a simple type
-//			String type = getType(name);
-
-			// TODO(adm244): get DataType or create it then assign pointer to it
-			// this way we don't need to hold the data in memory and can change its size
-
-//			AddressSpace varSpace = new GenericAddressSpace(name, 32, AddressSpace.TYPE_VARIABLE,
-//					program.getAddressFactory().getNumAddressSpaces() + 1);
-//			Address varAddress = varSpace.getAddress(0);
-
-			// FIXME(adm244): move this into analyzer/loader
-			DataType dt = dtManager.getDataType(new DataTypePath("/external/data", name));
-//			if (dt == null) {
-////				dt = new TypedefDataType(name, DataType.DEFAULT);
-//				dt = new StructureDataType(new CategoryPath("/external/data"), name, 0);
-//
-//				int id = dtManager.startTransaction("CREATION:" + name);
-//				dtManager.addDataType(dt, DataTypeConflictHandler.DEFAULT_HANDLER);
-//				dtManager.endTransaction(id, true);
-//			}
-
-			record.tag = ConstantPool.POINTER_FIELD;
-//			record.token = "DATA:" + name;
-			record.token = name;
-//			record.type = PointerDataType.dataType;
-			record.type = dtManager.getPointer(dt);
+			fillImportData(record, scriptState.imports.get(index));
 			break;
 		}
 
@@ -141,7 +106,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 			// TODO(adm244): create a function pointer
 
 //			record.tag = ConstantPool.POINTER_METHOD;
-//			record.token = "FUNCTION:" + function.getName();
+//			record.token = function.getName();
 //
 //			DataType dt = dtManager.getDataType(new DataTypePath("/external/functions", record.token));
 //			if (dt == null) {
@@ -155,7 +120,9 @@ public class ConstantPoolScom3 extends ConstantPool {
 //				dtManager.addDataType(funcDef, DataTypeConflictHandler.DEFAULT_HANDLER);
 //				dtManager.endTransaction(id, true);
 //			}
-//
+
+//			FunctionDefinitionDataType func = new FunctionDefinitionDataType(function.getName());
+////
 //			record.type = new PointerDataType(dt);
 			break;
 		}
@@ -218,6 +185,24 @@ public class ConstantPoolScom3 extends ConstantPool {
 		// option to toggle between Latin1 and UTF-8 encodings
 		record.setUTF8Data(string);
 		record.type = PointerDataType.dataType;
+	}
+
+	private void fillImportData(Record record, String name) {
+		DataType dt = dtManager.getDataType(CPOOL_DATA_PATH, name);
+
+		// FIXME(adm244): move this into analyzer/loader
+//		if (dt == null) {
+////			dt = new TypedefDataType(name, DataType.DEFAULT);
+//			dt = new StructureDataType(new CategoryPath("/external/data"), name, 0);
+//
+//			int id = dtManager.startTransaction("CREATION:" + name);
+//			dtManager.addDataType(dt, DataTypeConflictHandler.DEFAULT_HANDLER);
+//			dtManager.endTransaction(id, true);
+//		}
+
+		record.tag = ConstantPool.POINTER_FIELD;
+		record.token = name;
+		record.type = dtManager.getPointer(dt);
 	}
 
 }

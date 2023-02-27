@@ -147,6 +147,7 @@
 		<!--<pcode inject="uponentry" dynamic="true" />-->
 	</prototype>
 
+	<!-- FIXME(adm244): remove this, since farcall will be used as a POINTER_METHOD from ConstantPool -->
 	<prototype name="farcall" extrapop="0" stackshift="0">
 		<input>
 			<pentry minsize="1" maxsize="1000" align="4">

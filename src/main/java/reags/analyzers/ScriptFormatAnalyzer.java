@@ -38,8 +38,10 @@ import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.block.BasicBlockModel;
 import ghidra.program.model.block.CodeBlock;
 import ghidra.program.model.data.DataType;
-import ghidra.program.model.data.Undefined;
-import ghidra.program.model.data.Undefined1DataType;
+import ghidra.program.model.data.DataTypeConflictHandler;
+import ghidra.program.model.data.DataTypeManager;
+import ghidra.program.model.data.TypedefDataType;
+import ghidra.program.model.data.Undefined4DataType;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.Processor;
 import ghidra.program.model.listing.Data;
@@ -61,6 +63,7 @@ import ghidra.util.exception.CancelledException;
 import ghidra.util.exception.DuplicateNameException;
 import ghidra.util.task.TaskMonitor;
 import reags.ScriptLoader;
+import reags.pcodeInject.ConstantPoolScom3;
 import reags.scom3.ScriptFixup;
 import reags.scom3.ScriptImport;
 import reags.state.ExternalFunction;
@@ -459,11 +462,13 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 					importTypeCache.put(value, importType);
 				}
 
+				String importName = imports[(int) value].getName();
+
 				if (importType == ImportType.FUNCTION) {
 					fixupType = FixupType.IMPORT_FUNCTION;
 
 					Address externalAddress = externalBlockBase.add(externals.size() * 4);
-					String importName = imports[(int) value].getName();
+//					String importName = imports[(int) value].getName();
 					if (externals.containsKey(importName)) {
 						externalAddress = externals.get(importName);
 					} else {
@@ -506,6 +511,11 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 					instr.addOperandReference(opindex, externalAddress, RefType.INDIRECTION, SourceType.ANALYSIS);
 				} else {
 					fixupType = FixupType.IMPORT_DATA;
+
+					if (!state.data.containsKey(value)) {
+						state.data.put(value, importName);
+					}
+
 					instr.addOperandReference(opindex, importsOffset, RefType.READ, SourceType.ANALYSIS);
 				}
 			}
@@ -555,6 +565,22 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 			} else {
 				api.createBookmark(instr.getAddress(), "Fixup error", "Undefined fixup type");
 				setBackgroundColor(program, instr.getAddress(), Color.RED);
+			}
+		}
+
+		DataTypeManager dtManager = program.getDataTypeManager();
+
+		// ### CREATE IMPORTED DATA TYPES ###
+		for (Entry<Long, String> dataSet : state.data.entrySet()) {
+			String name = dataSet.getValue();
+
+			DataType dt = dtManager.getDataType(ConstantPoolScom3.CPOOL_DATA_PATH, name);
+			if (dt == null) {
+//				dt = new TypedefDataType(ConstantPoolScom3.CPOOL_DATA_PATH, name, DataType.DEFAULT);
+				dt = new TypedefDataType(ConstantPoolScom3.CPOOL_DATA_PATH, name, Undefined4DataType.dataType);
+				int id = dtManager.startTransaction("CREATION:" + name);
+				dtManager.addDataType(dt, DataTypeConflictHandler.DEFAULT_HANDLER);
+				dtManager.endTransaction(id, true);
 			}
 		}
 
