@@ -29,9 +29,6 @@
 	</element>-->
 
 	<register_data>
-		<register name="counter" hidden="true" />
 		<register name="_farsp" hidden="true" />
-		<!--<register name="_paramsp" hidden="true" />-->
-		<!--<register name="_funcArgs" hidden="true" />-->
 	</register_data>
 </processor_spec>

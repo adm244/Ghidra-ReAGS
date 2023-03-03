@@ -79,7 +79,7 @@ public class PcodeInjectLibraryScom3 extends PcodeInjectLibrary {
 	}
 
 	private long getNextUniqueBase() {
-		long result = uniqueBase;
+		long result = 0x400000;
 		uniqueBase += UNIQUE_ENTRY_SIZE;
 		return result;
 	}

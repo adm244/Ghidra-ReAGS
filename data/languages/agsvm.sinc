@@ -2,7 +2,17 @@
 
 # FIXME(adm244): there are bugged behaviors with certain instructions
 # make sure to understand how they supposed to work and implement them as such.
-# For now definitely bugged are: land, lor, memwrite.ptr, memread.ptr
+
+# FIXME(adm244): there's a problem with an unaligned stack variables
+# see "tboxComputer_OnActivate$1" for example
+
+# FIXME(adm244): goto appears in "dock_is_possible$0", also CONCAT22(..)
+
+# FIXME(adm244): some functions crash decompiler :(
+
+@define BYTE "1"
+@define WORD "2"
+@define DWORD "4"
 
 @define SIZE "4"
 
@@ -19,16 +29,17 @@ define alignment=4;
 
 define space ram type=ram_space size=$(SIZE) default;
 define space register type=register_space size=$(SIZE);
-#define space farStack type=ram_space size=$(SIZE);
 define space farSpace type=ram_space size=$(SIZE);
 define space paramStack type=ram_space size=$(SIZE);
 
 # general purpose registers
-define register offset=0x00 size=$(SIZE) [ ax bx cx dx ];
+define register offset=0x00 size=$(SIZE) [ ax         bx         cx         dx         ];
+#define register offset=0x00 size=$(WORD) [ ax.w   _   bx.w   _   cx.w   _   dx.w   _   ];
+#define register offset=0x00 size=$(BYTE) [ ax.b _ _ _ bx.b _ _ _ cx.b _ _ _ dx.b _ _ _ ];
 # special meaning registers
 define register offset=0x14 size=$(SIZE) [ sp op mar ];
 # utility registers not present in virtual machine
-define register offset=0x20 size=$(SIZE) [ pc counter _farsp ];
+define register offset=0x20 size=$(SIZE) [ pc _farsp ];
 
 # operations used for p-code injection
 define pcodeop memcpyCallOther;
@@ -36,27 +47,30 @@ define pcodeop movlitCallOther;
 define pcodeop farcallCallOther;
 define pcodeop memzeroCallOther;
 
-#define pcodeop arrnewCallOther;
-# operations used as black-box functions
-#define pcodeop strcmp;
-#define pcodeop streq;
-#define pcodeop strneq;
 #TOKENS
 define token operation (32)
     opcode   = ( 0,23)
     instance = (24,31)
 ;
 
+#    ctx_reg = (0, 2)
 define token operand (32)
-    reg1 = (0, 2)
-    reg2 = (0, 2)
-    arg1 = (0,31) signed
-    arg2 = (0,31) signed
-    arg3 = (0,31) signed
+    reg1   = (0, 2)
+    reg2   = (0, 2)
+    reg1.b = (0, 2)
+    reg2.b = (0, 2)
+    reg1.w = (0, 2)
+    reg2.w = (0, 2)
+    arg1   = (0,31) signed
+    arg2   = (0,31) signed
+    arg3   = (0,31) signed
 ;
 
-attach variables [ reg1 reg2 ] [ _ sp mar ax bx cx op dx ];
+# TODO(adm244): investigate if sub-pieces of special registers can also be used
+attach variables [ reg1   reg2   ] [ _ sp mar ax   bx   cx   op dx   ];
 
+#attach variables [ reg1.b reg2.b ] [ _ _  _   ax.b bx.b cx.b _  dx.b ];
+#attach variables [ reg1.w reg2.w ] [ _ _  _   ax.w bx.w cx.w _  dx.w ];
 # MARCO
 macro push(x) {
     *:$(SIZE) sp = x;
@@ -116,12 +130,12 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # memread
 :memread4 reg1         is opcode=0x07; reg1 {
-    reg1 = *:4 mar;
+    reg1 = *:$(SIZE) mar;
 }
 
 # memwrite
 :memwrite4 reg1        is opcode=0x08; reg1 {
-    *:4 mar = reg1:4;
+    *:$(SIZE) mar = reg1;
 }
 
 # mulreg
@@ -180,7 +194,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 }
 
 # lte
-:cmple reg1, reg2      is opcode=0x14; reg1; reg2 {
+:cmple reg1, reg2      is opcode=0x14; reg1 & reg1.b; reg2 {
     reg1 = zext(reg1 s<= reg2);
 }
 
@@ -202,22 +216,26 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # memreadb
 :memread1 reg1         is opcode=0x18; reg1 {
-    reg1 = *:1 mar;
+#    reg1.b = *:$(BYTE) mar;
+#    reg1 = sext(reg1.b);
+    reg1 = zext(*:$(BYTE) mar);
 }
 
 # memreadw
 :memread2 reg1         is opcode=0x19; reg1 {
-    reg1 = *:2 mar;
+#    reg1.w = *:$(WORD) mar;
+#    reg1 = sext(reg1.w);
+    reg1 = zext(*:$(WORD) mar);
 }
 
 # memwriteb
 :memwrite1 reg1        is opcode=0x1a; reg1 {
-    *:1 mar = reg1:1;
+    *:$(BYTE) mar = reg1:1;
 }
 
 # memwritew
 :memwrite2 reg1        is opcode=0x1b; reg1 {
-    *:2 mar = reg1:2;
+    *:$(WORD) mar = reg1:2;
 }
 
 # jz
@@ -286,7 +304,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # modreg
 :mod reg1, reg2        is opcode=0x28; reg1; reg2 {
-    reg1 = reg1 % reg2;
+    reg1 = reg1 s% reg2;
 }
 
 # xorreg
@@ -296,14 +314,13 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # notreg
 :lnot reg1             is opcode=0x2a; reg1 {
-#    if (reg1 == 0) goto <false>;
-#
-#    reg1 = 0;
-#    goto inst_next;
-#
-#    <false>
-#    reg1 = 1;
-    reg1 = zext(!reg1:1);
+    if (reg1 == 0) goto <true>;
+
+    reg1 = 0;
+    goto inst_next;
+
+    <true>
+    reg1 = 1;
 }
 
 # shiftleft
@@ -328,19 +345,16 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # memwriteptr
 :memwrite.ptr reg1     is opcode=0x2f; reg1 {
-#    FIXME(adm244): incorrect behavior
     *:$(SIZE) mar = reg1;
 }
 
 # memreadptr
 :memread.ptr reg1      is opcode=0x30; reg1 {
-#    FIXME(adm244): incorrect behavior
     reg1 = *:$(SIZE) mar;
 }
 
 # memzeroptr
 :memzero.ptr           is opcode=0x31 {
-#    FIXME(adm244): incorrect behavior
     *:$(SIZE) mar = 0;
 }
 

@@ -82,7 +82,7 @@
 		<prototype name="nearcall" extrapop="-4" stackshift="-4">
 			<input>
 				<!-- NOTE: offset=twos(maxsize+4) -->
-				<pentry minsize="1" maxsize="1000" align="4">
+				<pentry minsize="1" maxsize="1000" align="1" extension="inttype">
 					<addr space="stack" offset="0xFFFFFC14" />
 				</pentry>
 			</input>
@@ -117,12 +117,12 @@
 	</default_proto>
 
 	<!-- TODO(adm244): rename to "__thiscall" since it's forced to have one anyways -->
-	<prototype name="nearcallas" extrapop="unknown" stackshift="-4" hasthis="true">
+	<prototype name="__thiscall" extrapop="-4" stackshift="-4" hasthis="true">
 		<input>
 			<pentry minsize="1" maxsize="4">
 				<register name="op" />
 			</pentry>
-			<pentry minsize="1" maxsize="1000" align="4">
+			<pentry minsize="1" maxsize="1000" align="1">
 				<addr space="stack" offset="0xFFFFFC14" />
 			</pentry>
 		</input>
