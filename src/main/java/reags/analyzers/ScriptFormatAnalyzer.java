@@ -37,13 +37,16 @@ import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.block.BasicBlockModel;
 import ghidra.program.model.block.CodeBlock;
+import ghidra.program.model.data.DWordDataType;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataTypeManager;
+import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.TypedefDataType;
 import ghidra.program.model.data.Undefined4DataType;
 import ghidra.program.model.lang.Language;
 import ghidra.program.model.lang.Processor;
+import ghidra.program.model.listing.BookmarkType;
 import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
@@ -54,6 +57,7 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
+import ghidra.program.model.scalar.Scalar;
 import ghidra.program.model.symbol.ExternalLocation;
 import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.RefType;
@@ -429,8 +433,48 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 			byte type = fixups[i].getType();
 			int offset = fixups[i].getOffset();
 
+			// NOTE(adm244): this is used to store old-style strings (only?)
+			if (type == ScriptFixup.DATAPOINTER && dataBlock != null) {
+				Address dataPointerAddress = dataBlock.getStart().add(offset);
+				if (!dataBlock.contains(dataPointerAddress)) {
+					// data block does not contain this address, offset is wrong
+					// TODO: log this issue
+				} else {
+					// FIXME(adm244): use relative pointer; IBO32DataType doesn't work with 0
+					// offsets
+					// PointerTypedef with offset seems to not work at all...
+//					Data pointer = api.createData(dataPointerAddress, DWordDataType.dataType);
+//					Scalar offsetScalar = (Scalar) pointer.getValue();
+//					Address dataAddress = dataBlock.getStart().add(offsetScalar.getUnsignedValue());
+					long dataOffset = api.getInt(dataPointerAddress);
+					Address dataAddress = dataBlock.getStart().add(dataOffset);
+					if (!dataBlock.contains(dataAddress)) {
+						// data block does not contain this address, offset is wrong
+						// TODO: log this issue
+					} else {
+						long dataSize = dataPointerAddress.subtract(dataAddress);
+						if (dataSize != 200) {
+							api.createBookmark(dataAddress, BookmarkType.WARNING,
+									"DATAPOINTER fixup is not a string or a string with unusual size.");
+						}
+						api.createAsciiString(dataAddress, (int) dataSize);
+					}
+
+					// FIXME(adm244): consider an alternative that doesn't involve data changing
+					// (like relative pointers), but for now it will do...
+					api.setInt(dataPointerAddress, (int) dataAddress.getOffset());
+					api.createData(dataPointerAddress, PointerDataType.dataType);
+//					state.pointers.put((long) offset, dataAddress);
+				}
+
+				state.fixups.put(dataPointerAddress, FixupType.DATAPOINTER);
+
+				continue;
+			}
+
 			Address codeOffset = codeBlock.getStart().add(offset * 4);
 			Instruction instr = api.getInstructionContaining(codeOffset);
+
 			int opindex = (int) ((codeOffset.getOffset() - instr.getAddress().getOffset()) / 4) - 1;
 			long value = api.getInt(codeOffset);
 
@@ -532,24 +576,23 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 
 			else if (type == ScriptFixup.DATA && dataBlock != null) {
 				Address dataOffset = dataBlock.getStart().add(value);
-				api.createData(dataOffset, DataType.DEFAULT);
-//				api.createData(dataOffset, Undefined1DataType.dataType);
 
-				fixupType = FixupType.DATA;
+				if (state.fixups.get(dataOffset) == FixupType.DATAPOINTER) {
+					// NOTE(adm244): this is a pointer to an old-style string (or data?)
+					fixupType = FixupType.DATAPOINTER;
+//					Address realDataAddress = state.pointers.get(value);
+//					instr.addOperandReference(opindex, realDataAddress, RefType.DATA, SourceType.ANALYSIS);
+				} else {
+					api.createData(dataOffset, DataType.DEFAULT);
+//					api.createData(dataOffset, Undefined1DataType.dataType);
+					fixupType = FixupType.DATA;
+//					instr.addOperandReference(opindex, dataOffset, RefType.DATA, SourceType.ANALYSIS);
+				}
 
 				instr.addOperandReference(opindex, dataOffset, RefType.DATA, SourceType.ANALYSIS);
 			}
 
-			// TODO(adm244): implement DATAPOINTER and STACK fixup types
-
-			// TODO(adm244): NOT IMPLEMENTED
-			else if (type == ScriptFixup.DATAPOINTER && dataBlock != null) {
-				// TODO(adm244): handle this case
-				fixupType = FixupType.DATAPOINTER;
-
-				api.createBookmark(instr.getAddress(), "DATAPOINTER", "DATAPOINTER fixup detected");
-				setBackgroundColor(program, instr.getAddress(), Color.ORANGE);
-			}
+			// TODO(adm244): implement STACK fixup types
 
 			// TODO(adm244): NOT IMPLEMENTED
 			else if (type == ScriptFixup.STACK) {

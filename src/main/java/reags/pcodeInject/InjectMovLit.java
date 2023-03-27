@@ -44,6 +44,10 @@ public class InjectMovLit extends InjectPayloadFarStack {
 		case IMPORT_FUNCTION:
 			pcode.emitAssignCPoolRef(output, value, ConstantPoolScom3.CPOOL_IMPORT_FUNCTION);
 			break;
+			
+		case DATAPOINTER:
+			pcode.emitAssignCPoolRef(output, value, ConstantPoolScom3.CPOOL_DATAPOINTER);
+			break;
 
 		default:
 			pcode.emitAssignImmediate(output, value);

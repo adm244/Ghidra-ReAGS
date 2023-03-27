@@ -17,6 +17,7 @@ public class ScriptAnalysisState implements AnalysisState {
 	public HashMap<Long, String> imports;
 	public HashMap<Long, ExternalFunction> functions;
 	public HashMap<Long, String> data;
+//	public HashMap<Long, Address> pointers;
 
 	private ScriptAnalysisState(Program program) {
 //		this.program = program;
@@ -26,6 +27,7 @@ public class ScriptAnalysisState implements AnalysisState {
 		imports = new HashMap<Long, String>();
 		functions = new HashMap<Long, ExternalFunction>();
 		data = new HashMap<Long, String>();
+//		pointers = new HashMap<Long, Address>();
 	}
 
 	public static ScriptAnalysisState getState(Program program) {

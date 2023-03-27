@@ -5,11 +5,12 @@ import ghidra.program.model.data.CategoryPath;
 import ghidra.program.model.data.CharDataType;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.data.DataTypeManager;
-import ghidra.program.model.data.FunctionDefinitionDataType;
+import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.IntegerDataType;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.ShortDataType;
 import ghidra.program.model.lang.ConstantPool;
+import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
@@ -29,8 +30,9 @@ public class ConstantPoolScom3 extends ConstantPool {
 	public static final String CPOOL_IMPORT_DATA = "4";
 	public static final String CPOOL_IMPORT_FUNCTION = "5";
 	public static final String CPOOL_NEW_ARRAY = "6";
+	public static final String CPOOL_DATAPOINTER = "7";
 
-//	private Program program;
+	private Program program;
 	private DataTypeManager dtManager;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
@@ -39,7 +41,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 //	private AddressSpace externalSpace;
 
 	public ConstantPoolScom3(Program program) {
-//		this.program = program;
+		this.program = program;
 
 		Memory memory = program.getMemory();
 		dtManager = program.getDataTypeManager();
@@ -162,6 +164,24 @@ public class ConstantPoolScom3 extends ConstantPool {
 //
 //			record.type = new PointerDataType(funcDef);
 //			break;
+
+		case CPOOL_DATAPOINTER:
+//			Address dataAddress = scriptState.pointers.get(index);
+//			Data data = DataUtilities.getDataAtAddress(program, dataAddress);
+//			DataType dataType = dtManager.getPointer(data.getDataType());
+//
+//			address = dataBlock.getStart().add(index);
+//			
+//			record.tag = ConstantPool.PRIMITIVE;
+//			record.token = "pointer_to_pointer";
+//			record.value = address.getOffset();
+//			record.type = dtManager.getPointer(dataType);
+			
+			address = dataBlock.getStart().add(index);
+//			address = scriptState.pointers.get(index);
+			fillPrimitive(record, address, "pointer_to_pointer");
+//			record.type = dtManager.getPointer(PointerDataType.dataType);
+			break;
 
 		default:
 			break;
