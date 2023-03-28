@@ -1,5 +1,20 @@
 # sleigh specification file for AGSVM
 
+# KNOWN ISSUES (28.03.23):
+#   FIXME(adm244): stack analysis fails to get proper stack frame size
+#       if local variables allocated with MAR register (pointing to SP)
+#
+#   FIXME(adm244): sometimes decompiler fails to recognize while-loop and outputs do-while (and goto's).
+#       I think it has something to do with memread, memwrite instructions and SP pointer;
+#       probably related to previous problem...
+#       (mmm3:GlobalScript.scom3:GetLucasSavegameListBox$2)
+#
+#   FIXME(adm244): !!! HIGH PRIORITY !!!
+#       sometimes decompiler crashes with this message:
+#       "Cannot invoke "ghidra.program.model.pcode.Varnode.getAddress()" because the return value of
+#           "ghidra.program.model.listing.VariableStorage.getFirstVarnode()" is null"
+# 
+
 # FIXME(adm244): there are bugged behaviors with certain instructions
 # make sure to understand how they supposed to work and implement them as such.
 
@@ -22,6 +37,7 @@
 @define CPOOL_IMPORT_DATA "4"
 @define CPOOL_IMPORT_FUNCTION "5"
 @define CPOOL_NEW_ARRAY "6"
+@define CPOOL_DATAPOINTER "7"
 
 define endian=little;
 
@@ -488,7 +504,7 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 #    reg1 = count; arg2 = size; arg3 = isManaged
 #    FIXME(adm244): cannot make it to display correct data type name;
 #    decompiler takes data type from newobject destination varnode (reg1 in this case)
-    local tmp = cpool(reg1, arg2, $(CPOOL_NEW_ARRAY), arg3);
+    local tmp = cpool(0:4, arg2, $(CPOOL_NEW_ARRAY), arg3);
     reg1 = newobject(tmp, reg1);
 }
 

@@ -9,6 +9,7 @@ import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.IntegerDataType;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.ShortDataType;
+import ghidra.program.model.data.VoidDataType;
 import ghidra.program.model.lang.ConstantPool;
 import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Program;
@@ -53,7 +54,11 @@ public class ConstantPoolScom3 extends ConstantPool {
 //		externalSpace = AddressSpace.EXTERNAL_SPACE;
 	}
 
-	private DataType getPrimitiveArrayType(int size) {
+	private DataType getPrimitiveArrayType(int size, boolean isManaged) {
+		if (isManaged) {
+			return VoidDataType.dataType;
+		}
+		
 		switch (size) {
 		case 1:
 			return CharDataType.dataType;
@@ -133,11 +138,11 @@ public class ConstantPoolScom3 extends ConstantPool {
 			int type = (int) ref[2];
 
 			// FIXME(adm244): doesn't work as it should...
-			DataType dataType = getPrimitiveArrayType((int) index);
+			DataType dataType = getPrimitiveArrayType((int) index, type == 1);
 
 			DataType dt = dtManager.getPointer(dataType);
 
-			record.tag = ConstantPool.POINTER_FIELD;
+			record.tag = ConstantPool.POINTER_METHOD;
 //			record.tag = ConstantPool.CLASS_REFERENCE;
 			record.token = dataType.getDisplayName();
 			record.type = dt;
@@ -166,21 +171,8 @@ public class ConstantPoolScom3 extends ConstantPool {
 //			break;
 
 		case CPOOL_DATAPOINTER:
-//			Address dataAddress = scriptState.pointers.get(index);
-//			Data data = DataUtilities.getDataAtAddress(program, dataAddress);
-//			DataType dataType = dtManager.getPointer(data.getDataType());
-//
-//			address = dataBlock.getStart().add(index);
-//			
-//			record.tag = ConstantPool.PRIMITIVE;
-//			record.token = "pointer_to_pointer";
-//			record.value = address.getOffset();
-//			record.type = dtManager.getPointer(dataType);
-			
 			address = dataBlock.getStart().add(index);
-//			address = scriptState.pointers.get(index);
 			fillPrimitive(record, address, "pointer_to_pointer");
-//			record.type = dtManager.getPointer(PointerDataType.dataType);
 			break;
 
 		default:
@@ -209,17 +201,6 @@ public class ConstantPoolScom3 extends ConstantPool {
 
 	private void fillImportData(Record record, String name) {
 		DataType dt = dtManager.getDataType(CPOOL_DATA_PATH, name);
-
-		// FIXME(adm244): move this into analyzer/loader
-//		if (dt == null) {
-////			dt = new TypedefDataType(name, DataType.DEFAULT);
-//			dt = new StructureDataType(new CategoryPath("/external/data"), name, 0);
-//
-//			int id = dtManager.startTransaction("CREATION:" + name);
-//			dtManager.addDataType(dt, DataTypeConflictHandler.DEFAULT_HANDLER);
-//			dtManager.endTransaction(id, true);
-//		}
-
 		record.tag = ConstantPool.POINTER_FIELD;
 		record.token = name;
 		record.type = dtManager.getPointer(dt);

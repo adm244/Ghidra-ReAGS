@@ -59,7 +59,7 @@
 	<stackpointer register="sp" space="ram" growth="positive" />
 	<deadcodedelay space="stack" delay="2" />
 
-	<!-- TODO(adm244): is it though? double check
+	<!-- TODO(adm244): is it though? double check -->
 	<!-- FIXME(adm244): the "farStack" problem is STILL EXISTS!!! -->
 
 	<!-- INVESTIGATE(adm244): "This routine is used by the initialization process to add
