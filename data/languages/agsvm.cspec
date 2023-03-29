@@ -2,6 +2,13 @@
 
 <!-- See Relax specification: Ghidra/Framework/SoftwareModeling/data/languages/compiler_spec.rxg -->
 
+<!-- FIXME(adm244): the "farStack" problem STILL EXISTS!!! -->
+<!-- I can't find a way to fix it right now, although it would be easy if we could
+     just disable high variable creation for "farStack" space (I think).
+     Also, this looks related (and unsolved):
+        https://github.com/NationalSecurityAgency/ghidra/issues/3897
+-->
+
 <!-- NOTES:
     - (TODO) There's a "problem" with "boolean and" and "boolean or" instructions.
         For multiple and's and or's AGS compiler outputs a series of "if" statements
@@ -10,12 +17,6 @@
         last basic block for this series. Maybe we can "help" the decompiler to
         optimize this mess?
 
-    - (SOLVED???) It seems that calling conventions work as intended at this point
-        the only exception is "nearcall" and "nearcallas", these two tend
-        to mess up a stack from time to time, I guess that's expected
-        since "extrapop" is "unknown" but it doesn't work even when there's
-        no function arguments that it expects to be passed into it...
-    
     - (SOLVED) PROBLEM:
         For now farcall and call stacks are the same and it seems to work fine
         for unoptimized assembly outputed by the classic AGS compiler, but
@@ -27,7 +28,7 @@
         it for farpush, farcall and farsubsp instructions...
         The problem here is that Ghidra's analysis will be wrong in this case,
         right? Also, parameters order is reversed.
-        
+
       SOLUTION:
         Ended up using two temporary memory spaces: "farStack" and "paramStack".
         "farStack" is used to store data pushed and poped with "farpush" and "farsubsp"
@@ -38,7 +39,7 @@
         The arguments count (N) is determined by "setfuncargs" instruction or by a
         number of pushed arguments onto "farStack" if there's no such instruction
         (like in very old SCOM3 versions)
- -->
+-->
 
 <compiler_spec>
 	<data_organization>
@@ -59,8 +60,8 @@
 	<stackpointer register="sp" space="ram" growth="positive" />
 	<deadcodedelay space="stack" delay="2" />
 
-	<!-- TODO(adm244): is it though? double check -->
-	<!-- FIXME(adm244): the "farStack" problem is STILL EXISTS!!! -->
+	<!-- "This process sets up a 'register relative' space for this architecture." -->
+	<spacebase name="farStack" register="_farsp" space="farSpace" />
 
 	<!-- INVESTIGATE(adm244): "This routine is used by the initialization process to add
 	address ranges to which there is never an (indirect) pointer" -->
@@ -71,13 +72,9 @@
 	</element>-->
 	<!--<nohighptr>
 		<register name="_farsp" />
-		<range space="farSpace" first="0" last="0xFFFFFFFF" />
+		<range space="farStack" first="0" last="0xFFFFFFFF" />
+		<range space="paramStack" first="0" last="0xFFFFFFFF" />
 	</nohighptr>-->
-
-	<!-- TODO(adm244): investigate if we can use this to create a "stack" for "farcall" -->
-	<!-- "This process sets up a 'register relative' space for this architecture." -->
-	<!-- NOTE(adm244): this "might" solve "farStack" problem... -->
-	<spacebase name="farStack" register="_farsp" space="farSpace" />
 
 	<default_proto>
 		<prototype name="nearcall" extrapop="-4" stackshift="-4">
@@ -117,7 +114,6 @@
 		</prototype>
 	</default_proto>
 
-	<!-- TODO(adm244): rename to "__thiscall" since it's forced to have one anyways -->
 	<prototype name="__thiscall" extrapop="-4" stackshift="-4" hasthis="true">
 		<input>
 			<pentry minsize="1" maxsize="4">

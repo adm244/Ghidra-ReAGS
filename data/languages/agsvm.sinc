@@ -2,18 +2,13 @@
 
 # KNOWN ISSUES (28.03.23):
 #   FIXME(adm244): stack analysis fails to get proper stack frame size
-#       if local variables allocated with MAR register (pointing to SP)
+#       if local variables allocated/addressed with MAR register (pointing to SP)
 #
 #   FIXME(adm244): sometimes decompiler fails to recognize while-loop and outputs do-while (and goto's).
 #       I think it has something to do with memread, memwrite instructions and SP pointer;
 #       probably related to previous problem...
 #       (mmm3:GlobalScript.scom3:GetLucasSavegameListBox$2)
 #
-#   FIXME(adm244): !!! HIGH PRIORITY !!!
-#       sometimes decompiler crashes with this message:
-#       "Cannot invoke "ghidra.program.model.pcode.Varnode.getAddress()" because the return value of
-#           "ghidra.program.model.listing.VariableStorage.getFirstVarnode()" is null"
-# 
 
 # FIXME(adm244): there are bugged behaviors with certain instructions
 # make sure to understand how they supposed to work and implement them as such.
@@ -22,8 +17,6 @@
 # see "tboxComputer_OnActivate$1" for example
 
 # FIXME(adm244): goto appears in "dock_is_possible$0", also CONCAT22(..)
-
-# FIXME(adm244): some functions crash decompiler :(
 
 @define BYTE "1"
 @define WORD "2"
@@ -186,42 +179,42 @@ dest: rel  is arg1 [ rel = inst_next + (arg1 * $(SIZE)); ] {
 
 # isequal
 :cmpeq reg1, reg2      is opcode=0x0f; reg1; reg2 {
-    reg1 = zext(reg1 == reg2);
+    reg1 = sext(reg1 == reg2);
 }
 
 # notequal
 :cmpneq reg1, reg2     is opcode=0x10; reg1; reg2 {
-    reg1 = zext(reg1 != reg2);
+    reg1 = sext(reg1 != reg2);
 }
 
 # greater
 :cmpgt reg1, reg2      is opcode=0x11; reg1; reg2 {
-    reg1 = zext(reg1 s> reg2);
+    reg1 = sext(reg1 s> reg2);
 }
 
 # lessthan
 :cmplt reg1, reg2      is opcode=0x12; reg1; reg2 {
-    reg1 = zext(reg1 s< reg2);
+    reg1 = sext(reg1 s< reg2);
 }
 
 # gte
 :cmpge reg1, reg2      is opcode=0x13; reg1; reg2 {
-    reg1 = zext(reg1 s>= reg2);
+    reg1 = sext(reg1 s>= reg2);
 }
 
 # lte
 :cmple reg1, reg2      is opcode=0x14; reg1 & reg1.b; reg2 {
-    reg1 = zext(reg1 s<= reg2);
+    reg1 = sext(reg1 s<= reg2);
 }
 
 # and (logical)
 :land reg1, reg2       is opcode=0x15; reg1; reg2 {
-    reg1 = zext(reg1 != 0 && reg2 != 0);
+    reg1 = sext(reg1 != 0 && reg2 != 0);
 }
 
 # or (logical)
 :lor reg1, reg2        is opcode=0x16; reg1; reg2 {
-    reg1 = zext(reg1 != 0 || reg2 != 0);
+    reg1 = sext(reg1 != 0 || reg2 != 0);
 }
 
 # call
