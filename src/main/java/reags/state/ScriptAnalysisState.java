@@ -10,6 +10,8 @@ import reags.analyzers.FixupType;
 
 public class ScriptAnalysisState implements AnalysisState {
 
+	public static final String SCRIPT_ANALYSIS_STATE = "SCRIPT_ANALYSIS_STATE";
+
 //	private Program program;
 
 	public HashMap<Address, FixupType> fixups;

@@ -1,22 +1,37 @@
 # sleigh specification file for AGSVM
 
+#
+# TODO LIST:
+#
+#   - Save ScriptAnalysisState somewhere, so it can be loaded/recreated after loading project.
+#   - Get "__nearcall" function arguments count based on their mangled name.
+#   - Guess global variables sizes and create them.
+#   - Code cleanup.
+#
+
+#
 # KNOWN ISSUES (28.03.23):
+#
 #   FIXME(adm244): stack analysis fails to get proper stack frame size
 #       if local variables allocated/addressed with MAR register (pointing to SP)
 #
-#   FIXME(adm244): sometimes decompiler fails to recognize while-loop and outputs do-while (and goto's).
+#   FIXME(adm244): sometimes decompiler fails to recognize control-flow and outputs do-while and goto's.
 #       I think it has something to do with memread, memwrite instructions and SP pointer;
 #       probably related to previous problem...
 #       (mmm3:GlobalScript.scom3:GetLucasSavegameListBox$2)
 #
-
-# FIXME(adm244): there are bugged behaviors with certain instructions
-# make sure to understand how they supposed to work and implement them as such.
-
-# FIXME(adm244): there's a problem with an unaligned stack variables
-# see "tboxComputer_OnActivate$1" for example
-
-# FIXME(adm244): goto appears in "dock_is_possible$0", also CONCAT22(..)
+#   FIXME(adm244): sometimes CONCAT*(..) appears at boolean AND and OR operations
+#       when variables less than int32 are used; the nature of VM is that registers don't store
+#       actual values, they store objects that store these values instead, which makes it tricky
+#       to implement a proper front-end in case of Ghidra's processor module.
+#       (it seems to be more connected to "farStack" problem though...)
+#
+#   FIXME(adm244): there are bugged behaviors with certain instructions
+#       make sure to understand how they supposed to work and implement them as such.
+#
+#   FIXME(adm244): there's a problem with an unaligned stack variables
+#       see "tboxComputer_OnActivate$1" for example
+#
 
 @define BYTE "1"
 @define WORD "2"

@@ -5,13 +5,11 @@ import ghidra.program.model.data.CategoryPath;
 import ghidra.program.model.data.CharDataType;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.data.DataTypeManager;
-import ghidra.program.model.data.DataUtilities;
 import ghidra.program.model.data.IntegerDataType;
 import ghidra.program.model.data.PointerDataType;
 import ghidra.program.model.data.ShortDataType;
 import ghidra.program.model.data.VoidDataType;
 import ghidra.program.model.lang.ConstantPool;
-import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryBlock;
@@ -33,7 +31,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 	public static final String CPOOL_NEW_ARRAY = "6";
 	public static final String CPOOL_DATAPOINTER = "7";
 
-	private Program program;
+//	private Program program;
 	private DataTypeManager dtManager;
 	private MemoryBlock dataBlock;
 	private MemoryBlock codeBlock;
@@ -42,7 +40,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 //	private AddressSpace externalSpace;
 
 	public ConstantPoolScom3(Program program) {
-		this.program = program;
+//		this.program = program;
 
 		Memory memory = program.getMemory();
 		dtManager = program.getDataTypeManager();
@@ -58,7 +56,7 @@ public class ConstantPoolScom3 extends ConstantPool {
 		if (isManaged) {
 			return VoidDataType.dataType;
 		}
-		
+
 		switch (size) {
 		case 1:
 			return CharDataType.dataType;

@@ -38,7 +38,7 @@
         from a top of "farStack" to "paramStack" and makes a call.
         The arguments count (N) is determined by "setfuncargs" instruction or by a
         number of pushed arguments onto "farStack" if there's no such instruction
-        (like in very old SCOM3 versions)
+        (like in very old SCOM3 versions).
 -->
 
 <compiler_spec>
@@ -58,6 +58,8 @@
 	</global>
 
 	<stackpointer register="sp" space="ram" growth="positive" />
+
+	<!-- FIXME(adm244): this is sort of a workaround that hides the problem -->
 	<deadcodedelay space="stack" delay="2" />
 
 	<!-- "This process sets up a 'register relative' space for this architecture." -->
@@ -77,7 +79,7 @@
 	</nohighptr>-->
 
 	<default_proto>
-		<prototype name="nearcall" extrapop="-4" stackshift="-4">
+		<prototype name="__nearcall" extrapop="-4" stackshift="-4">
 			<input>
 				<!-- NOTE: offset=twos(maxsize+4) -->
 				<pentry minsize="1" maxsize="1000" align="1" extension="inttype">
@@ -145,7 +147,7 @@
 	</prototype>
 
 	<!-- FIXME(adm244): remove this, since farcall will be used as a POINTER_METHOD from ConstantPool -->
-	<prototype name="farcall" extrapop="0" stackshift="0">
+	<prototype name="__farcall" extrapop="0" stackshift="0">
 		<input>
 			<pentry minsize="1" maxsize="1000" align="4">
 				<addr space="paramStack" offset="4" />
@@ -163,7 +165,7 @@
 		</unaffected>
 	</prototype>
 
-	<prototype name="farcallas" extrapop="0" stackshift="0" hasthis="true">
+	<prototype name="__farcallas" extrapop="0" stackshift="0" hasthis="true">
 		<input>
 			<pentry minsize="1" maxsize="4">
 				<register name="op" />

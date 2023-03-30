@@ -37,7 +37,6 @@ import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.block.BasicBlockModel;
 import ghidra.program.model.block.CodeBlock;
-import ghidra.program.model.data.DWordDataType;
 import ghidra.program.model.data.DataType;
 import ghidra.program.model.data.DataTypeConflictHandler;
 import ghidra.program.model.data.DataTypeManager;
@@ -57,7 +56,6 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
-import ghidra.program.model.scalar.Scalar;
 import ghidra.program.model.symbol.ExternalLocation;
 import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.RefType;
@@ -386,6 +384,7 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		return Address.NO_ADDRESS;
 	}
 
+	// TODO(adm244): use monitor object to report status
 	private boolean applyFixups(Program program, TaskMonitor monitor) throws IOException, Exception {
 		Memory memory = program.getMemory();
 
@@ -402,6 +401,7 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		ScriptFixup[] fixups = readFixups(fixupsBlock);
 		ScriptImport[] imports = readImports(importsBlock);
 
+		// FIXME(adm244): save state in project file
 		ScriptAnalysisState state = ScriptAnalysisState.getState(program);
 		FarCallAnalysisState pcodeInjectState = FarCallAnalysisState.getState(program);
 
@@ -410,13 +410,6 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 		HashMap<Long, Boolean> hasThisCache = new HashMap<Long, Boolean>();
 		HashMap<Long, Integer> argumentsCountCache = new HashMap<Long, Integer>();
 		HashMap<Long, Address> callAddrCache = new HashMap<Long, Address>();
-
-		// FIXME(adm244): instead of calculating many offsets here, calculate them in
-		// *.slaspec
-		// e.g. ":jmp abs is opcode=??; arg1 [ abs = inst_next + arg1 * 4 ] { ... }"
-		// this will output an absolute address for a jump instruction: "jmp 0x12345"
-
-		// NOTE(adm244): jmp instructions: address(instr.next()) + (arg1 * 4)
 
 //		AddressSpace constSpace = program.getAddressFactory().getConstantSpace();
 
@@ -443,9 +436,6 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 					// FIXME(adm244): use relative pointer; IBO32DataType doesn't work with 0
 					// offsets
 					// PointerTypedef with offset seems to not work at all...
-//					Data pointer = api.createData(dataPointerAddress, DWordDataType.dataType);
-//					Scalar offsetScalar = (Scalar) pointer.getValue();
-//					Address dataAddress = dataBlock.getStart().add(offsetScalar.getUnsignedValue());
 					long dataOffset = api.getInt(dataPointerAddress);
 					Address dataAddress = dataBlock.getStart().add(dataOffset);
 					if (!dataBlock.contains(dataAddress)) {
@@ -464,7 +454,6 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 					// (like relative pointers), but for now it will do...
 					api.setInt(dataPointerAddress, (int) dataAddress.getOffset());
 					api.createData(dataPointerAddress, PointerDataType.dataType);
-//					state.pointers.put((long) offset, dataAddress);
 				}
 
 				state.fixups.put(dataPointerAddress, FixupType.DATAPOINTER);
@@ -633,16 +622,18 @@ public class ScriptFormatAnalyzer extends AbstractAnalyzer {
 
 		// ### CREATE EXTERNAL FUNCTION DEFINITION ###
 		for (Entry<Long, ExternalFunction> funcSet : state.functions.entrySet()) {
-			ExternalFunction entry = funcSet.getValue();
-			Function externalFunction = api.createFunction(entry.getAddress(), entry.getName());
-			if (externalFunction != null) {
-				ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN,
-						externalFunction.getName(), null, SourceType.ANALYSIS);
+			try {
+				ExternalFunction entry = funcSet.getValue();
+				Function externalFunction = api.createFunction(entry.getAddress(), entry.getName());
+				if (externalFunction != null) {
+					ExternalLocation externalLocation = externalManager.addExtFunction(Library.UNKNOWN,
+							externalFunction.getName(), null, SourceType.ANALYSIS);
 
-				externalFunction.setThunkedFunction(externalLocation.getFunction());
-				externalFunction.setCallingConvention(entry.hasThis() ? "farcallas" : "farcall");
-
-				entry.setFunction(externalFunction);
+					externalFunction.setThunkedFunction(externalLocation.getFunction());
+					externalFunction.setCallingConvention(entry.hasThis() ? "__farcallas" : "__farcall");
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 
